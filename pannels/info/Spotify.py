@@ -1,6 +1,6 @@
 import functions, requests, time, json, base64, datetime
 from PIL import Image, ImageDraw, ImageEnhance
-
+from threading import Thread
 
 """
 TO USE THIS INTEGRATION:
@@ -14,6 +14,11 @@ all these needs to be added to the json file "spotifysecrets.json" in the root o
 
 LOG_NEWDATA = False
 
+settings = {
+    "Threaded":True,
+    "HAS Follow":True
+}
+
 small05 = functions.font["small05"]
 icons07 = functions.font["icons07"]
 
@@ -26,6 +31,7 @@ fn = 0
 covers = {}
 data = {"playing":False, "time":datetime.datetime.fromtimestamp(0), "data":{}}
 oldTS = datetime.datetime.fromtimestamp(0)
+oldCover = ""
 needNewDataPLZ = False
 
 MS = datetime.timedelta(milliseconds=1)
@@ -33,7 +39,8 @@ MS = datetime.timedelta(milliseconds=1)
 spotySecrets = {}
 
 with open(f"{functions.PATH}/secrets.json", "r") as fi:
-    file = json.load(fi)["spotify"]
+    secrets = json.load(fi)
+    file = secrets["spotify"]
     spotySecrets["refresh_token"] = file["refresh_token"]
     spotySecrets["Authorization"] = base64.b64encode("".join([file["client_id"], ":", file["client_secret"]]).encode("ascii")).decode("ascii")
 
@@ -104,6 +111,9 @@ def dial(e):
 def threadedData():
     global data, oldTS, needNewDataPLZ
     while True:
+        if not settings["Threaded"] and not needNewDataPLZ:
+            time.sleep(2)
+            continue
         # Get new data from spotify (every 2 seconds) or (system sendt skip request) or (song just ended)
         delta = (datetime.datetime.now() - oldTS)
         # print(delta.seconds, oldTS)
@@ -113,14 +123,20 @@ def threadedData():
 
         time.sleep(0.5)
 
+spotifyRunner = Thread(target=threadedData, name="SpotifyRunner", daemon=True)
+spotifyRunner.start()
+
 def get():
-    global data, covers, fn
+    global data, covers, fn, oldTS, oldCover, needNewDataPLZ
     fn +=1
 
     im = Image.new(mode="RGB", size=(64, 32))
 
     # If you are not playing annything on spotify return black screen
     if data["data"] == {}: return im
+
+    if not settings["Threaded"] and (datetime.datetime.now() - oldTS).seconds > 2:
+        needNewDataPLZ = True
     
     delta = (datetime.datetime.now() - data["time"])
 
@@ -134,6 +150,12 @@ def get():
         covers[coverURL] = ImageEnhance.Contrast(covers[coverURL]).enhance(1.25)
         if len(covers) > 20: del covers[list(covers.keys())[0]]
         print(f"There is now {len(covers)} saved covers.")
+
+    if settings["HAS Follow"] and coverURL != oldCover and functions.haWantsChanging():
+        oldCover = coverURL
+        coverColors = functions.get_palette(covers[coverURL])
+        print(coverColors)
+        functions.setHaColors(coverColors["dominant"], coverColors["accent"], coverColors["third"])
 
     infoArea = Image.new(mode="RGB", size=(30,30))
     info = ImageDraw.Draw(infoArea)
