@@ -60,3 +60,31 @@ struct adafruit_matrix_bonnet_pinout {
     static constexpr pin_t PIN_CLK = 10; // SRCLK: clocks on RISING edge
     static constexpr pin_t PIN_LAT = 9; // RCLK: latches on RISING edge
 ```
+
+RPI Pinouts:  
+```
+(LVL) 3V  |#   #|  .   (5V)
+      R1  |2   #|  .   (5V)
+      G1  |3   #|  .   (GND)
+      B1  |4  14|  A
+(GND)  .  |#  15|  B
+      R2  |17 18|  C
+      G2  |27  #|  .   (GND)
+      B2  |22 23|  D
+(LVL) 3V  |#  24|  OE
+     CLK  |10  #|  .   (GND)
+     LAT  |9  25|  .
+```
+
+HUB75 Connector pinout:  
+
+```
+ R1   |X X|   G1
+ B1   |X #|   GND
+ R2   |X X|   G2
+ B2  [ X #|   NC
+  A  [ X X|   B
+  C   |X X|   D
+CLK   |X X|   LAT
+ OE   |X #|   GND
+```

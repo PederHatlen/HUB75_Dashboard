@@ -10,7 +10,6 @@ def setlocale(name):
     finally: locale.setlocale(locale.LC_ALL, saved)
 
 small05 = functions.font["small05"]
-color = functions.color
 
 def get():
     im, d = functions.getBlankIM()
@@ -27,7 +26,7 @@ def get():
 
     for deg in range(0, 360, 30):
         x, y = math.cos(math.radians(deg)), math.sin(math.radians(deg))
-        d.line((round(x*(r-w+1)) + o, round(y*(r-w+2)) + o, round(x*r)+o, round(y*r)+o), color["orange"], 1)
+        d.line((round(x*(r-w+1)) + o, round(y*(r-w+2)) + o, round(x*r)+o, round(y*r)+o), functions.color["orange"], 1)
     for deg in range(0, 360, 90):
         x, y = math.cos(math.radians(deg)), math.sin(math.radians(deg))
         d.line((round(x*(r-w+1)) + o, round(y*(r-w+2)) + o, round(x*r)+o, round(y*r)+o), "#fff", 1)
@@ -36,16 +35,16 @@ def get():
     minute = (now.minute/60) * 2*math.pi - math.pi/2
     second = (now.second/60) * 2*math.pi - math.pi/2
 
-    d.line((o, o, round(math.cos(hour)*hLen)+o, round(math.sin(hour)*hLen)+o), color["white"], 1)
-    d.line((o, o, round(math.cos(minute)*mLen)+o, round(math.sin(minute)*mLen)+o), color["white"], 1)
-    d.line((o, o, round(math.cos(second)*sLen)+o, round(math.sin(second)*sLen)+o), color["orange"], 1)
+    d.line((o, o, round(math.cos(hour)*hLen)+o, round(math.sin(hour)*hLen)+o), functions.color["white"], 1)
+    d.line((o, o, round(math.cos(minute)*mLen)+o, round(math.sin(minute)*mLen)+o), functions.color["white"], 1)
+    d.line((o, o, round(math.cos(second)*sLen)+o, round(math.sin(second)*sLen)+o), functions.color["orange"], 1)
 
     with setlocale(LOCALE_STRING):
-        d.text((34, 0), now.strftime("%A"), color["orange"], small05)
-        d.text((34, 8), now.strftime("%-d %b")[:-1], color["white"], small05)
-        d.text((34, 16), f"Uke {str(now.isocalendar()[1]).rjust(2, '0')}", color["white"], small05)
+        d.text((34, 0), now.strftime("%A"), functions.color["orange"], small05)
+        d.text((34, 8), now.strftime("%-d %b")[:-1], functions.color["white"], small05)
+        d.text((34, 16), f"Uke {str(now.isocalendar()[1]).rjust(2, '0')}", functions.color["white"], small05)
 
-    # d.point((15, 15), color["orange"])
+    # d.point((15, 15), functions.color["orange"])
 
     # d.point((*[(x*2, 0) for x in range(32)], *[(0, y*2) for y in range(16)]))
 

@@ -1,28 +1,19 @@
-import Display, virtual_display, menu, pannels, functions, error
+import functions
+import Display, virtual_display, menu, pannels, error
 import time, gpiozero, datetime, traceback
-from threading import Thread
-
 from flask import request
 
-DO_AUTOSELECTING = True
+settings = {"Autoselecting":True}
 
 # Initialize the webserver/running screen emulator
 socketio = virtual_display.run(1337, allow_cors=True)
 
-oldoutTS = 0
-oldimage = pannels.packages["Blank"].get()
-
-consolerender = False
+oldimage = functions.getBlankIM()[0]
 
 spotifyWasPlaying = False
 autoSelected = False
 oldSelected = ""
 lastRenderEvent = datetime.datetime.now()
-
-IsMenuActive= False
-
-spotifyRunner = Thread(target=pannels.packages["Spotify"].threadedData, name="SpotifyRunner", daemon=True)
-spotifyRunner.start()
 
 class dial:
     def __init__(self, dialNumber, BTNpin, D1, D2, isMenu = False):
@@ -37,7 +28,7 @@ class dial:
         self.DIAL.when_rotated_counter_clockwise = (lambda: self.dial("L"))
     
     def dial(self, dir):
-        if IsMenuActive:
+        if menu.active:
             menu.dial(f"{self.dialNumber}{dir}")
             return render(menu.get())
 
@@ -47,10 +38,8 @@ class dial:
     
     def btn(self):
         if self.isMenu:
-            global IsMenuActive
-            IsMenuActive = not IsMenuActive
-            if IsMenuActive: render(menu.get())
-            else: pannels.packages[menu.selected].needsRendering = True
+            menu.active = not menu.active
+            if menu.active: render(menu.get())
             return
         
         try: pannels.packages[menu.selected].btn()
@@ -63,9 +52,7 @@ def render(im):
     if oldimage != im:
         oldimage = im
         Display.render(im)
-        sockFrame = functions.PIL2Socket(im)
-        if consolerender: functions.renderConsole(sockFrame)
-        return socketio.emit("refresh", sockFrame)
+        return socketio.emit("refresh", functions.PIL2Socket(im))
 
 def autoSelector():
     global spotifyWasPlaying, menu, oldSelected, autoSelected
@@ -104,9 +91,9 @@ if __name__ == "__main__":
     # Render loop
     while True:
         start = time.time()
-        if DO_AUTOSELECTING: autoSelector()
+        if settings["Autoselecting"]: autoSelector()
 
-        if IsMenuActive: render(menu.get())
+        if menu.active: render(menu.get())
         else:
             try: render(pannels.packages[menu.selected].get())
             except Exception as e:

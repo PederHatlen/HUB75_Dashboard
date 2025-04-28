@@ -1,6 +1,6 @@
 import functions, datetime
 
-ps, gap = 4, 2
+ps, gap = 4, 2 # Pixel size, pixel gap
 
 def get():
     im, d = functions.getBlankIM()

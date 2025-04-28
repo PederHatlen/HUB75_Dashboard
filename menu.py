@@ -5,6 +5,7 @@ from functions import color
 small05 = functions.font["small05"]
 
 selected = "Weather" # Default pannel can be sett here
+active = False
 
 DISPLAY_DEBUG = True
 
@@ -18,7 +19,6 @@ menuColor = {
     "info":color["green"],
     "DEFAULT":"#444"
 }
-
 
 PNames = [p for p in pannels.__all__ if DISPLAY_DEBUG or p not in pannels.menu["dev"]]
 

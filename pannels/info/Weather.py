@@ -1,6 +1,5 @@
 import functions, datetime, requests, json, textwrap
 from PIL import Image, ImageDraw, ImageEnhance
-import numpy as np
 from functions import color
 
 small05 = functions.font["small05"]
@@ -9,10 +8,14 @@ lfn = 0
 expires = datetime.datetime.now(tz=datetime.timezone.utc)
 dataCuttof = datetime.datetime.now(tz=datetime.timezone.utc)
 
-lat, long = 63.4224, 10.4320 # Trondheim Norway
+# lat, long = 63.4224, 10.4320 # Trondheim Norway
+
+settings = {
+    "lat":63.4224,
+    "long":10.4320
+}
 
 # def contrast(img, level=0.7): return ImageEnhance.Contrast(img).enhance(level)
-
 def contrast(img, level=1.2):
     def cont(c): return 128 + level * (c - 128)
     return img.point(cont)
@@ -32,9 +35,13 @@ windIcon = functions.imFromArr([[BC,BC,WC,GC,BC],[GC,GC,WC,GC,BC],[WC,WC,WC,WC,W
 def get_cached_data():
     global expires
     with open("./tempWeather.json") as fi:
-        cach = json.load(fi)
-        expires = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(hours=2)
-        return cach
+        try:
+            cach = json.load(fi)
+            expires = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(hours=2)
+            return cach
+        except:
+            print("Coud not get cache, persuming expired")
+            return {"expires":(datetime.datetime.now(tz=datetime.timezone.utc)-datetime.timedelta(hours=2)).isoformat()}
 
 def get_data():
     global expires
@@ -45,7 +52,7 @@ def get_data():
         return cach
 
     headers = {'User-Agent':'https://github.com/PederHatlen/MatrixDashboard email:pederhatlen@gmail.com',}
-    response = requests.get(f"https://api.met.no/weatherapi/locationforecast/2.0/complete?lat={round(lat,4)}&lon={round(long,4)}",headers=headers)
+    response = requests.get(f"https://api.met.no/weatherapi/locationforecast/2.0/complete?lat={round(settings['lat'],4)}&lon={round(settings['long'],4)}",headers=headers)
     try: expires = datetime.datetime.strptime(response.headers["Expires"][:-4], "%a, %d %b %Y %H:%M:%S", ).replace(tzinfo=datetime.timezone.utc)
     except Exception as E:
         print(E)

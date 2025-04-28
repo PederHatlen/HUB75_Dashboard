@@ -8,22 +8,25 @@
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 </head>
 <body>
-    <canvas width="64" height="32" style="width:200vmin;max-width:100%;image-rendering:pixelated;"></canvas>
+    <canvas width="640" height="320" style="width:200vmin;max-width:100%;image-rendering:pixelated;"></canvas>
     <script>
         var ctx = document.querySelector("canvas").getContext("2d");
-
+        ctx.shadowBlur = 5;
+        var pixelated = true;
         var s=io();
         s.on("refresh",img=>{
-            ctx.clearRect(0,0,64,32);
+            ctx.clearRect(0,0,640,320);
             for(let x in img){
                 for(let y in img[x]){
-                    ctx.fillStyle = img[x][y];
-                    ctx.fillRect(y,x,1,1);
+                    if(img[x][y] == "#000000") continue;
+                    ctx.fillStyle = ctx.shadowColor = img[x][y];
+                    ctx.fillRect(y*10+2*pixelated,x*10+2*pixelated,10-4*pixelated,10-4*pixelated);
                 }
             }
         });
-	document.body.onkeydown = (e)=>{
+        document.body.onkeydown = (e)=>{
             switch(e.key){
+                case "p": pixelated = !pixelated;break;
                 case "a": s.emit('inp', {'dir':'0L'});break;
                 case "d": s.emit('inp', {'dir':'0R'});break;
                 case "s": s.emit('inp', {'btn':0});break;

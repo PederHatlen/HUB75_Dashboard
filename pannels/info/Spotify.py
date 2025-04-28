@@ -36,13 +36,8 @@ needNewDataPLZ = False
 
 MS = datetime.timedelta(milliseconds=1)
 
-spotySecrets = {}
-
-with open(f"{functions.PATH}/secrets.json", "r") as fi:
-    secrets = json.load(fi)
-    file = secrets["spotify"]
-    spotySecrets["refresh_token"] = file["refresh_token"]
-    spotySecrets["Authorization"] = base64.b64encode("".join([file["client_id"], ":", file["client_secret"]]).encode("ascii")).decode("ascii")
+spotySecrets = functions.secrets["spotify"]
+spotySecrets["Authorization"] = base64.b64encode("".join([spotySecrets["client_id"], ":", spotySecrets["client_secret"]]).encode("ascii")).decode("ascii")
 
 def getDaToken():
     if "runout" not in spotySecrets or spotySecrets["runout"] < datetime.datetime.now():

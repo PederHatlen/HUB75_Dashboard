@@ -33,6 +33,7 @@
         var prevFrame = performance.now();
 
         ctx.shadowBlur = 5;
+        var pixelated = true;
 
         var s=io();
         s.on("refresh",img=>{
@@ -44,9 +45,10 @@
             for(let x in img){
                 for(let y in img[x]){
                     if(img[x][y] == "#000000") continue;
-                    ctx.shadowColor = img[x][y];
                     ctx.fillStyle = img[x][y];
-                    ctx.fillRect(y*10+2,x*10+2,6,6);
+                    ctx.shadowColor = img[x][y];
+                    if (pixelated){ctx.fillRect(y*10+2,x*10+2,6,6);
+                    }else{ctx.fillRect(y*10,x*10,10,10);}
                 }
             }
             document.getElementById("comptime").innerHTML = Math.round(performance.now() - prevFrame);
@@ -54,6 +56,7 @@
 
         document.body.onkeydown = (e)=>{
             switch(e.key){
+                case "p": pixelated = !pixelated;break;
                 case "a": s.emit('inp', {'dir':'0L'});break;
                 case "d": s.emit('inp', {'dir':'0R'});break;
                 case "s": s.emit('inp', {'btn':0});break;

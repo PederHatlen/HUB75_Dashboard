@@ -31,7 +31,7 @@ def character(n, fill = "#fff", size = 8):
 
     return char
 
-size, depth = 6, 3
+size, depth = 6, 20
 
 width = size+4
 height = width+size

@@ -99,15 +99,21 @@ def get():
 
     timeLeft = (endTime - datetime.datetime.now()).total_seconds()
 
-    timeStr = f"{int(timeLeft//3600)} {int((timeLeft%3600)//60)} {int(timeLeft%60):0>2}"
+    # timeStr = f"{int(timeLeft//3600)} {int((timeLeft%3600)//60)} {int(timeLeft%60):0>2}"
 
-    timeStr = ""
+    # timeStr = f"{int(timeLeft//3600)}H  " if int(timeLeft//3600) != 0 else ""
+    # timeStr += f"{int((timeLeft%3600)//60):0>2}M  {int(timeLeft%60):0>2}S"
+    # d.text((64,1), timeStr, font=small05, anchor="ra")
 
-    timeStr += f"{int(timeLeft//3600)}H  " if int(timeLeft//3600) != 0 else ""
-    timeStr += f"{int((timeLeft%3600)//60):0>2}M  {int(timeLeft%60):0>2}S"
+    lableColor = functions.color["orange"]
+    d.text((63, 1), "S", fill=lableColor, font=small05, anchor="ra")
+    d.text((50, 1), "M", fill=lableColor, font=small05, anchor="ra")
+    d.text((35, 1), "H", fill=lableColor, font=small05, anchor="ra")
 
+    d.text((59, 1), f"{int(timeLeft%60):0>2}", font=small05, anchor="ra")
+    d.text((44, 1), f"{int((timeLeft%3600)//60):0>2}", font=small05, anchor="ra")
+    d.text((31, 1), f"{int(timeLeft//3600)}", font=small05, anchor="ra")
 
-    d.text((64,1), timeStr, font=small05, anchor="ra")
     d.text((64,8), endTime.strftime('%H:%M'), font=small05, anchor="ra")
 
     # d.text((32,), , font=small05)
