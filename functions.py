@@ -64,7 +64,7 @@ def getBlankIM():
     d.fontmode = "1"
     return im, d
 
-def imFromArr(arr): return Image.fromarray(np.array(arr, dtype=np.uint8), mode="RGB")
+def imFromArr(arr, mode = "RGB"): return Image.fromarray(np.array(arr, dtype=np.uint8), mode=mode)
 
 def clamp8(x): return min(255, max(0, int(x)))
 

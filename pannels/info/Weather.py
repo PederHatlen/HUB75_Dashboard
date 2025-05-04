@@ -1,165 +1,159 @@
-import functions, datetime, requests, json, textwrap
-from PIL import Image, ImageDraw, ImageEnhance
-from functions import color
+import functions, requests, json
+from PIL import Image
+from datetime import datetime, timezone, timedelta
 
 small05 = functions.font["small05"]
-
-lfn = 0
-expires = datetime.datetime.now(tz=datetime.timezone.utc)
-dataCuttof = datetime.datetime.now(tz=datetime.timezone.utc)
-
-# lat, long = 63.4224, 10.4320 # Trondheim Norway
 
 settings = {
     "lat":63.4224,
     "long":10.4320
 }
 
-# def contrast(img, level=0.7): return ImageEnhance.Contrast(img).enhance(level)
-def contrast(img, level=1.2):
-    def cont(c): return 128 + level * (c - 128)
-    return img.point(cont)
+# Static variables
+UTC = timezone.utc
 
 # Weather icons from YR
-with open("./weatherIcons.json", "r") as fi: weatherIcons = json.load(fi)
-icons      = {e:contrast(Image.open(f"./weatherIcons/{weatherIcons[e]['code']}.png")).resize((18,18), Image.Resampling.BOX) for e in weatherIcons.keys()}
-iconsSmall = {e:contrast(Image.open(f"./weatherIcons/{weatherIcons[e]['code']}.png")).resize((10,10), Image.Resampling.BILINEAR) for e in weatherIcons.keys()}
+with open("./weatherIcons_simple.json", "r") as fi: weatherIcons = json.load(fi)
+iconsLarge  = {e:Image.open(f"./weatherIcons/{weatherIcons[e]['code']}.png").resize((25,25), Image.Resampling.HAMMING) for e in weatherIcons.keys()}
+iconsMedium = {e:Image.open(f"./weatherIcons/{weatherIcons[e]['code']}.png").resize((20,20), Image.Resampling.HAMMING) for e in weatherIcons.keys()}
+iconsSmall  = {e:Image.open(f"./weatherIcons/{weatherIcons[e]['code']}.png").resize((15,15), Image.Resampling.HAMMING) for e in weatherIcons.keys()}
+
+# # With a pink background for distinguishing
+# bg = Image.new("RGBA", (100,100), "#ff0088")
+# iconsLarge  = {e:Image.alpha_composite(bg, Image.open(f"./weatherIcons/{weatherIcons[e]['code']}.png")).resize((25,25), Image.Resampling.HAMMING) for e in weatherIcons.keys()}
+# iconsMedium = {e:Image.alpha_composite(bg, Image.open(f"./weatherIcons/{weatherIcons[e]['code']}.png")).resize((20,20), Image.Resampling.HAMMING) for e in weatherIcons.keys()}
+# iconsSmall  = {e:Image.alpha_composite(bg, Image.open(f"./weatherIcons/{weatherIcons[e]['code']}.png")).resize((15,15), Image.Resampling.HAMMING) for e in weatherIcons.keys()}
 
 # Icons for current events
-LB = functions.hex2rgb(functions.color["lightblue"])
-WC, GC, BC = (255,255,255), (100,100,100), (0,0,0)
-rainIcon = functions.imFromArr([[LB,BC,BC,BC,LB],[LB,BC,LB,BC,BC],[BC,BC,LB,BC,LB],[LB,BC,BC,BC,LB],[LB,BC,LB,BC,BC],[BC,BC,LB,BC,BC]])
-cloudIcon = functions.imFromArr([[BC,WC,WC,BC,BC,BC],[WC,WC,WC,WC,WC,BC],[WC,WC,WC,WC,WC,WC],[WC,WC,WC,WC,WC,WC]])
-windIcon = functions.imFromArr([[BC,BC,WC,GC,BC],[GC,GC,WC,GC,BC],[WC,WC,WC,WC,WC],[BC,GC,WC,GC,GC],[BC,GC,WC,BC,BC]])
+LR = [*functions.hex2rgb(functions.color["lightred"]), 255]
+LB = [*functions.hex2rgb(functions.color["lightblue"]), 255]
+WC, GC, BC = (255,255,255,255), (100,100,100,255), (0,0,0,0)
+
+tempIconR = functions.imFromArr([[LR,LR,BC,BC,BC],[LR,LR,BC,LR,LR],[BC,BC,LR,BC,BC],[BC,BC,LR,BC,BC],[BC,BC,BC,LR,LR]], "RGBA")
+tempIconB = functions.imFromArr([[LB,LB,BC,BC,BC],[LB,LB,BC,LB,LB],[BC,BC,LB,BC,BC],[BC,BC,LB,BC,BC],[BC,BC,BC,LB,LB]], "RGBA")
+
+rainIcon = functions.imFromArr([[LB,BC,BC,BC,LB],[LB,BC,LB,BC,LB],[BC,BC,LB,BC,LB],[LB,BC,BC,BC,BC],[LB,BC,BC,LB,BC]], "RGBA")
+windIcon = functions.imFromArr([[BC,BC,WC,GC,BC],[GC,GC,WC,GC,BC],[WC,WC,WC,WC,WC],[BC,GC,WC,GC,GC],[BC,GC,WC,BC,BC]], "RGBA")
+covrIcon = functions.imFromArr([[BC,BC,WC,WC,BC],[GC,WC,WC,WC,WC],[WC,WC,WC,WC,WC],[GC,WC,WC,WC,GC]], "RGBA")
+
+# Global Variables
+expires, dataCuttof = datetime.now(tz=UTC), datetime.now(tz=UTC)
+offsetH, dn = 0, 0
+data = {}
+
+# Functions
+def get_data_cuttof(data):
+    for d in data["properties"]["timeseries"]:
+        if not set({"next_12_hours", "next_6_hours", "next_1_hours"}).issubset(set(d["data"].keys())):
+            return datetime.fromisoformat(d["time"])
 
 def get_cached_data():
-    global expires
     with open("./tempWeather.json") as fi:
-        try:
-            cach = json.load(fi)
-            expires = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(hours=2)
-            return cach
-        except:
-            print("Coud not get cache, persuming expired")
-            return {"expires":(datetime.datetime.now(tz=datetime.timezone.utc)-datetime.timedelta(hours=2)).isoformat()}
+        try: return json.load(fi)
+        except: return {}
 
 def get_data():
-    global expires
-    # return get_cached_data()
+    global expires, dataCuttof
     cach = get_cached_data()
-    if "expires" in cach and datetime.datetime.fromisoformat(cach["expires"]) > datetime.datetime.now(tz=datetime.timezone.utc):
+    if "expires" in cach and datetime.fromisoformat(cach["expires"]) > datetime.now(tz=UTC):
         print(f"Using cached data, expires {cach['expires']}")
+        expires = datetime.fromisoformat(cach["expires"])
+        dataCuttof = get_data_cuttof(cach)
         return cach
 
     headers = {'User-Agent':'https://github.com/PederHatlen/MatrixDashboard email:pederhatlen@gmail.com',}
     response = requests.get(f"https://api.met.no/weatherapi/locationforecast/2.0/complete?lat={round(settings['lat'],4)}&lon={round(settings['long'],4)}",headers=headers)
-    try: expires = datetime.datetime.strptime(response.headers["Expires"][:-4], "%a, %d %b %Y %H:%M:%S", ).replace(tzinfo=datetime.timezone.utc)
-    except Exception as E:
-        print(E)
-        expires = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(hours=4)
-        print("Could not parse expiration time (using +4 hours) Error: {E}")
-    print(f"Got new weatherdata, expiration: {expires}")
-    data = response.json()
-    data["expires"] = expires.isoformat()
 
-    with open("./tempWeather.json", "w") as fi:
-        fi.write(json.dumps(data))
+    try: expires = datetime.strptime(response.headers["Expires"][:-4], "%a, %d %b %Y %H:%M:%S").replace(tzinfo=UTC)
+    except Exception as E:
+        print(f"Could not parse expiration time (using +4 hours) Error: {E}")
+        expires = datetime.now(tz=UTC) + timedelta(hours=4)
+    print(f"Got new weatherdata, expiration: {expires}")
+
+    data = {"expires":expires.isoformat(), **response.json()}
+    dataCuttof = get_data_cuttof(data)
+
+    with open("./tempWeather.json", "w") as fi: fi.write(json.dumps(data))
     return data
     
 def get_current_hour(t):
     global data
     for d in data["properties"]["timeseries"]:
-        if d["time"][:13] == t.isoformat()[:13]:
-            return d["data"]
-        
-def get_cuttof(data):
-    for d in data["properties"]["timeseries"]:
-        if not set({"next_12_hours", "next_6_hours", "next_1_hours"}).issubset(set(d["data"].keys())):
-            return datetime.datetime.fromisoformat(d["time"])
+        if d["time"][:13] == t.isoformat()[:13]: return d["data"]
 
-# dn = 0
-# def dial(e):
-#     global dn
-#     print(dn)
-#     if e == "1R": dn+=1
-#     elif e == "1L": dn-=1
-
-offsetH = 0
 def dial(e):
-    global data, dataCuttof, offsetH
-    if e == "1R" and dataCuttof > datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(hours=offsetH+1):
-        offsetH+=1 
-    elif e == "1L" and offsetH > 0:
-        offsetH-=1
+    global dataCuttof, offsetH, dn
+    dn += (1 if e == "1R" else -1)
+    if e == "1R" and dataCuttof > datetime.now(tz=UTC) + timedelta(hours=offsetH+1): offsetH += 1
+    elif e == "1L" and offsetH > 0: offsetH -= 1
 
 def btn():
     global offsetH
     offsetH = 0
 
-data = {}
 def get():
-    global data, lfn, weatherIcons, expires, dataCuttof
+    global data
 
-    if datetime.datetime.now(tz=datetime.timezone.utc) > expires: 
-        data = get_data()
-        dataCuttof = get_cuttof(data)
-    
     im, d = functions.getBlankIM()
 
-    if data == {}: return im
+    if datetime.now(tz=UTC) > expires: data = get_data()
+    
+    if data == {}: 
+        d.text((32, 16), "No data", font=small05, anchor="mm")
+        return im
 
-    now = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(hours=offsetH)
+    now = datetime.now(tz=UTC) + timedelta(hours=offsetH)
     currentHour = get_current_hour(now)
 
-    # im.paste(icons[list(weatherIcons.keys())[dn//1 % len(weatherIcons.keys())]], (1, 1))
-    # im.paste(icons1[list(weatherIcons.keys())[dn//1 % len(weatherIcons.keys())]], (18, 1))
+    description = weatherIcons[currentHour['next_1_hours']['summary']['symbol_code']]["description"]
+    iconLarge = iconsLarge[currentHour['next_1_hours']['summary']['symbol_code']]
+    iconMedium = iconsMedium[currentHour['next_1_hours']['summary']['symbol_code']]
+    iconNext = iconsSmall[currentHour['next_6_hours']['summary']['symbol_code']]
 
-    # im.paste(iconsSmall[list(weatherIcons.keys())[dn//1 % len(weatherIcons.keys())]], (20, 7))
-    # im.paste(iconsSmall[list(weatherIcons.keys())[dn//1 % len(weatherIcons.keys())]], (32, 7))
+    # description = weatherIcons[list(weatherIcons.keys())[dn//1 % len(weatherIcons.keys())]]["description"]
+    # iconLarge = iconsLarge[list(weatherIcons.keys())[dn//1 % len(weatherIcons.keys())]]
+    # iconMedium = iconsMedium[list(weatherIcons.keys())[dn//1 % len(weatherIcons.keys())]]
+    # iconNext = iconsSmall[list(weatherIcons.keys())[dn//1 % len(weatherIcons.keys())]]
 
-    # im.paste(icons[list(weatherIcons.keys())[dn//1 % len(weatherIcons.keys())]], (1, 1))
-    
+    # Drawing icons and extra text, Changed sizes/positions, if showing other times
     if offsetH == 0:
-        im.paste(icons[currentHour['next_1_hours']['summary']['symbol_code']], (1, 1))
-        im.paste(iconsSmall[currentHour['next_6_hours']['summary']['symbol_code']], (20, 6))
-        im.paste(iconsSmall[currentHour['next_12_hours']['summary']['symbol_code']], (32, 6))
-        d.text((21, 0), "06", font=small05, fill=color["orange"])
-        d.text((33, 0), "12", font=small05, fill=color["orange"])
+        im.paste(iconLarge, (0, 0), mask=iconLarge)
+        im.paste(iconNext, (26, 7), mask=iconNext)
+        d.text((28, 1), "+6H", font=small05, fill=functions.color["orange"])
     else:
-        im.paste(iconsSmall[currentHour['next_1_hours']['summary']['symbol_code']], (3, 7))
-        im.paste(iconsSmall[currentHour['next_6_hours']['summary']['symbol_code']], (15, 7))
-        im.paste(iconsSmall[currentHour['next_12_hours']['summary']['symbol_code']], (27, 7))
-        d.text((1, 1), f"+{offsetH}", font=small05, fill=color["lightred"])
-        d.text((16, 1), "06", font=small05, fill=color["orange"])
-        d.text((28, 1), "12", font=small05, fill=color["orange"])
+        im.paste(iconMedium, (1, 5), mask=iconMedium)
+        im.paste(iconNext, (25, 9), mask=iconNext)
+        d.text((27, 3), "+6H", font=small05, fill=functions.color["orange"])
+        d.text((1, 0), now.strftime("%H:00"), font=small05, fill=functions.color["orange"])
 
-    # im.paste(iconsSmall[currentHour['next_6_hours']['summary']['symbol_code']], (20, 7))
-    # im.paste(iconsSmall[currentHour['next_12_hours']['summary']['symbol_code']], (32, 7))
-    # d.text((21, 1), "06", font=small05, fill=color["orange"])
-    # d.text((33, 1), "12", font=small05, fill=color["orange"])
+    d.text((1 if len(description) > 5 else 3, 26), description, font=small05)
 
-    description = "\n".join(textwrap.wrap(weatherIcons[currentHour['next_1_hours']['summary']['symbol_code']]["description"], int(40//small05.getlength("A")), break_long_words=False))
-    #description = "\n".join(textwrap.wrap(weatherIcons[list(weatherIcons.keys())[dn//1 % len(weatherIcons.keys())]]["description"], width=int(40//small05.getlength("A")), break_long_words=False))
-
+    # Get current conditions from data
     temp = currentHour["instant"]["details"]["air_temperature"]
-    temp = temp if (-10 < int(temp) < 10) else round(temp)
+    perc = currentHour["next_1_hours"]["details"]["precipitation_amount"]
+    wind = currentHour["instant"]["details"]["wind_speed"]
+    covr = round(currentHour["instant"]["details"]["cloud_area_fraction"])
 
-    percipation = currentHour["next_1_hours"]["details"]["precipitation_amount"]
-    percipation = percipation if (percipation < 10) else round(percipation)
+    temp = temp if -10 < temp < 10  else round(temp)
+    perc = perc if       perc < 100 else round(perc)
+    wind = wind if       wind < 100 else round(wind)
 
-    clouds = str(round(currentHour["instant"]["details"]["cloud_area_fraction"]))
-    wind = str(currentHour["instant"]["details"]["wind_speed"])
+    # # Maximum values (The longest suported lengths)
+    # temp = -9.9
+    # wind = 99.9
+    # percipation = 99.9
+    # clouds = 100
 
-    d.text((56 - small05.getlength(str(temp)), 1), str(temp), font=small05)
-    d.text((56 - small05.getlength(str(percipation)), 9), str(percipation), font=small05)
-    d.text((56 - small05.getlength(str(clouds)), 17), str(clouds), font=small05)
-    d.text((56 - small05.getlength(str(wind)), 25), str(wind), font=small05)
+    # Current concitions values
+    d.text((57,  1), str(temp), font=small05, anchor="rt")
+    d.text((57,  9), str(perc), font=small05, anchor="rt")
+    d.text((57, 17), str(wind), font=small05, anchor="rt")
+    d.text((57, 25), str(covr), font=small05, anchor="rt")
 
-    d.text((56, 1), "°C", font=small05, fill=(color["lightblue"] if temp < 0 else color["lightred"]))
-    im.paste(rainIcon, (57, 9))
-    im.paste(cloudIcon, (57, 17))
-    im.paste(windIcon, (57, 25))
-
-    d.multiline_text((1, (20 if "\n" in description else 25)), description, font=small05, spacing=1)
+    # Current concitions icons
+    im.paste(tempIconB if temp < 0 else tempIconR, (58, 1), mask=tempIconB)
+    im.paste(rainIcon, (58, 9), mask=rainIcon)
+    im.paste(windIcon, (58, 17), mask=windIcon)
+    im.paste(covrIcon, (58, 25), mask=covrIcon)
     
     return im
