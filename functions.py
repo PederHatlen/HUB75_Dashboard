@@ -4,6 +4,9 @@ from PIL import ImageFont, Image, ImageDraw
 PATH = str(pathlib.Path(__file__).parent.resolve())
 
 from sklearn.cluster import KMeans
+from skimage.color import rgb2lab, lab2rgb
+
+HA_LIGHT_IDS = ["light.bordlampe", "light.led_strip_light", "light.taklampe"]
 
 asciiTable = "`.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@"
 
@@ -94,41 +97,43 @@ def haWantsChanging():
     resp = requests.get(f"http://127.0.0.1:8123/api/states/input_boolean.do_follow_spotify", headers=headers)
     return resp.json()["state"] == "on"
 
-def setHaColors(desk, strip, roof, transition = 1):
+def setHaColors(colors, transition = 1):
     headers = {"Authorization": f"Bearer {secrets['homeassistant']['access_token']}","content-type": "application/json",}
-    for data in [{"entity_id":"light.bordlampe", "rgb_color":desk, "transition": transition}, {"entity_id":"light.led_strip_light", "rgb_color":strip, "transition": transition}, {"entity_id":"light.taklampe", "rgb_color":roof, "transition": transition}]:
+    for i in range(len(HA_LIGHT_IDS)):
+        data = {"entity_id":HA_LIGHT_IDS[i], "rgb_color":colors[i%len(colors)], "transition": transition}
+        print(f"Setting {data['entity_id']} to {data['rgb_color']}")
         resp = requests.post("http://127.0.0.1:8123/api/services/light/turn_on", headers=headers, json=data)
-        if resp.status_code == 200: print("Sucess")
-        else: print(f"Error {resp.status_code}")
+        if resp.status_code != 200: print(f"Error {resp.status_code}")
 
-def filter_colors(colors, brightness_threshold=(0.2, 0.9), saturation_threshold=0.2):
-    return [color for color in colors if brightness_threshold[0] < rgb_to_hsv(color)[2] < brightness_threshold[1] and rgb_to_hsv(color)[1] > saturation_threshold]
+def filter_colors(colors, brightness_threshold=(0.2, 1), saturation_threshold=0.3):
+    return np.array([color.tolist() for color in colors if brightness_threshold[0] < rgb_to_hsv(color)[2] < brightness_threshold[1] and rgb_to_hsv(color)[1] > saturation_threshold])
 
-def get_palette(im, n_colors=5):
+# Using K-Means to group into n- clusters of similar colors (default 3)
+# Filtering out too dark/light and low saturated colors, if possible
+# Using LAB colors for more even distribution
+def get_palette(im, n_colors=3, sorting="none"):
     img = np.array(im.convert("RGB"))
-    img_data = img.reshape((-1, 3))
+    pixels = img.reshape((-1, 3))
+    filtered = filter_colors(pixels)
+
+    finalColorArr = filtered if (len(filtered) >= n_colors) else pixels
+    pixels_lab = rgb2lab(finalColorArr.astype(np.float64) / 255.0)
 
     # Run KMeans
-    kmeans = KMeans(n_clusters=n_colors)
-    labels = kmeans.fit_predict(img_data)
-    centers = kmeans.cluster_centers_.astype(int)
+    kmeans = KMeans(n_clusters=n_colors, random_state=42)
+    labels = kmeans.fit_predict(pixels_lab)
 
-    # Count labels to find most common
-    label_counts = np.bincount(labels)
-    sorted_idx = np.argsort(-label_counts)  # Descending order
-    sorted_colors = centers[sorted_idx]
+    centers_reshaped = kmeans.cluster_centers_[np.newaxis, :, :]
+    palette = (lab2rgb(centers_reshaped)[0] * 255).astype(int)
 
-    # Filter colors
-    filtered_colors = filter_colors(sorted_colors)
-    # filtered_colors = sorted_colors
+    if sorting == "frequency": palette = palette[np.argsort(-np.bincount(labels))]                          # Sorting by cluster size
+    elif sorting == "saturation": palette = palette[np.argsort([rgb_to_hsv(c)[1] for c in palette])]        # Sorting by saturation
+    elif sorting == "lightness": palette = palette[np.argsort([-rgb2lum(c) for c in palette])]              # Sorting by luminance
 
-    # Pick colors
-    dominant_color = filtered_colors[0] if len(filtered_colors) > 0 else sorted_colors[0]
-    accent_color = filtered_colors[1] if len(filtered_colors) > 1 else sorted_colors[1]
-    third_color = filtered_colors[2] if len(filtered_colors) > 2 else sorted_colors[2]
+    palette = palette.tolist()
 
-    return {
-        'dominant': [int(i) for i in tuple(dominant_color)],
-        'accent': [int(i) for i in tuple(accent_color)],
-        'third': [int(i) for i in tuple(third_color)]
-    }
+    if len(filtered) < n_colors:
+        print(f"Pixel count unchanged, Final palette: {palette}")
+    else: print(f"Reduced pixel count by {((len(pixels)-len(filtered))/len(pixels))*100:.2f}% to {len(filtered)}, Final palette: {palette}")
+
+    return palette
