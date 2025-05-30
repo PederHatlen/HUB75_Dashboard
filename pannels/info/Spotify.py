@@ -29,12 +29,20 @@ prev_dial_turn = 0
 fn = 0
 
 covers = {}
+currentCover = ""
+
 data = {"playing":False, "time":datetime.datetime.fromtimestamp(0), "data":{}}
 oldTS = datetime.datetime.fromtimestamp(0)
 oldCover = ""
+HAIsUpdated = False
 needNewDataPLZ = False
+albumColors = []
+SWATCHSIZE = 3
+PALETTESIZE = 5
 
 MS = datetime.timedelta(milliseconds=1)
+
+fullscreen = False
 
 spotySecrets = functions.secrets["spotify"]
 spotySecrets["Authorization"] = base64.b64encode("".join([spotySecrets["client_id"], ":", spotySecrets["client_secret"]]).encode("ascii")).decode("ascii")
@@ -96,12 +104,15 @@ def pause():
 def btn(): (pause() if data["playing"] else play())
 
 def dial(e):
-    global prev_dial_turn
+    global prev_dial_turn, fullscreen
     if prev_dial_turn > datetime.datetime.now().timestamp() - 1: return
     prev_dial_turn = datetime.datetime.now().timestamp()
-    
+
     if e == "1R": next()
     elif e == "1L": previous()
+    elif e[0] == "0":
+        
+        fullscreen = not fullscreen
 
 def threadedData():
     global data, oldTS, needNewDataPLZ
@@ -122,17 +133,17 @@ spotifyRunner = Thread(target=threadedData, name="SpotifyRunner", daemon=True)
 spotifyRunner.start()
 
 def get():
-    global data, covers, fn, oldTS, oldCover, needNewDataPLZ
+    global data, covers, fn, oldTS, oldCover, HAIsUpdated, needNewDataPLZ, albumColors, currentCover
     fn +=1
 
-    im = Image.new(mode="RGB", size=(64, 32))
+    im = Image.new(mode="RGB", size=(functions.WIDTH, functions.HEIGHT))
 
     # If you are not playing annything on spotify return black screen
     if data["data"] == {}: return im
 
     if not settings["Threaded"] and (datetime.datetime.now() - oldTS).seconds > 2:
         needNewDataPLZ = True
-    
+
     delta = (datetime.datetime.now() - data["time"])
 
     # Set localdata to stored data
@@ -141,16 +152,26 @@ def get():
     # get the cover url, and download it if not allready
     coverURL = currentlyPlaying["item"]["album"]["images"][0]["url"]
     if coverURL not in covers:
-        covers[coverURL] = Image.open(requests.get(currentlyPlaying["item"]["album"]["images"][-1]["url"], stream=True).raw).resize((32,32), Image.Resampling.HAMMING)
-        covers[coverURL] = ImageEnhance.Contrast(covers[coverURL]).enhance(1.25)
+        currentCover = Image.open(requests.get(currentlyPlaying["item"]["album"]["images"][1]["url"], stream=True).raw)
+        covers[coverURL] = {
+            "small": ImageEnhance.Contrast(currentCover.resize((32,32), Image.Resampling.HAMMING)).enhance(1.25),
+            "large": ImageEnhance.Contrast(currentCover.resize((64,64), Image.Resampling.HAMMING)).enhance(1.25)
+        }
         if len(covers) > 20: del covers[list(covers.keys())[0]]
         print(f"There is now {len(covers)} saved covers.")
 
-    if settings["HAS Follow"] and coverURL != oldCover and functions.haWantsChanging():
+    if coverURL != oldCover:
         oldCover = coverURL
-        coverColors = functions.get_palette(covers[coverURL])
-        print(coverColors)
-        functions.setHaColors(coverColors["dominant"], coverColors["accent"], coverColors["third"])
+        HAIsUpdated = False
+        albumColors = functions.get_palette(covers[coverURL]["small"], PALETTESIZE, "lightness")
+
+    if settings["HAS Follow"] and not HAIsUpdated and functions.haWantsChanging():
+        HAIsUpdated = True
+        albumColors = functions.get_palette(covers[coverURL]["small"], PALETTESIZE, "lightness")
+        functions.setHaColors(functions.get_palette(covers[coverURL]["small"]))
+        
+    if fullscreen:
+        return covers[coverURL]["large"]
 
     infoArea = Image.new(mode="RGB", size=(30,30))
     info = ImageDraw.Draw(infoArea)
@@ -162,7 +183,7 @@ def get():
 
     scrolLen = (fn//2)
 
-    if titlelength > 32: 
+    if titlelength > 32:
         textPos = (-int(scrolLen%(max(titlelength, 32))),0)
         info.text(textPos, "    ".join([currentlyPlaying["item"]["name"]]*3), font=small05, fill=(255,255,255))
     else:
@@ -180,7 +201,9 @@ def get():
 
     info.text((12, 20), text=("1" if data["playing"] else "0"), font=icons07, fill=spotifyColor)
 
-    im.paste(covers[coverURL], (0,0))
+    for i in range(len(albumColors)): info.rectangle(((i*SWATCHSIZE+i, 15), (i*SWATCHSIZE+i+SWATCHSIZE-1,15+SWATCHSIZE-1)), fill=functions.rgb2hex(albumColors[i]))
+
+    im.paste(covers[coverURL]["small"], (0,0))
     im.paste(infoArea, (33,1))
     # im.paste(corrected.enhance(1.25),(32,0))
 
