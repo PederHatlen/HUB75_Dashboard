@@ -1,6 +1,6 @@
 import functions
 
-x, y = 32, 16
+x, y = functions.WIDTH//2, functions.HEIGHT//2
 
 drawing = [(x,y),]
 
@@ -12,9 +12,9 @@ def get():
 def dial(e):
     print(e)
     global x, y
-    if e == "0R":   x += (1 if x < 63 else 0)
+    if e == "0R":   x += (1 if x <= functions.WIDTH else 0)
     elif e == "0L": x -= (1 if x > 0 else 0)
-    elif e == "1R": y += (1 if y < 31 else 0)
+    elif e == "1R": y += (1 if y <= functions.HEIGHT else 0)
     elif e == "1L": y -= (1 if y > 0 else 0)
     if (x, y) not in drawing: drawing.append((x,y))
 
