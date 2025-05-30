@@ -48,12 +48,13 @@ def get_data_cuttof(data):
             return datetime.fromisoformat(d["time"])
 
 def get_cached_data():
-    with open("./tempWeather.json") as fi:
-        try: return json.load(fi)
-        except: return {}
+    try:
+        with open("./tempWeather.json") as fi: return json.load(fi)
+    except: return {}
 
 def get_data():
     global expires, dataCuttof
+    print("Getting new data")
     cach = get_cached_data()
     if "expires" in cach and datetime.fromisoformat(cach["expires"]) > datetime.now(tz=UTC):
         print(f"Using cached data, expires {cach['expires']}")
@@ -92,7 +93,7 @@ def btn():
     offsetH = 0
 
 def get():
-    global data
+    global data, expires
 
     im, d = functions.getBlankIM()
 
@@ -124,7 +125,7 @@ def get():
         im.paste(iconMedium, (1, 5), mask=iconMedium)
         im.paste(iconNext, (25, 9), mask=iconNext)
         d.text((27, 3), "+6H", font=small05, fill=functions.color["orange"])
-        d.text((1, 0), now.strftime("%H:00"), font=small05, fill=functions.color["orange"])
+        d.text((1, 0), now.astimezone(datetime.now(timezone.utc).astimezone().tzinfo).strftime("%H:00"), font=small05, fill=functions.color["orange"])
 
     d.text((1 if len(description) > 5 else 3, 26), description, font=small05)
 
