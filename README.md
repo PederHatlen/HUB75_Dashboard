@@ -55,7 +55,7 @@ I use this one:
 ```
 struct adafruit_matrix_bonnet_pinout {
     static constexpr pin_t PIN_RGB[] = {2,3,4,17,27,22};
-    static constexpr pin_t PIN_ADDR[] = {14,15,18,23};
+    static constexpr pin_t PIN_ADDR[] = {14,15,18,23,25};
     static constexpr pin_t PIN_OE = 24;   // /OE: output enable when LOW
     static constexpr pin_t PIN_CLK = 10; // SRCLK: clocks on RISING edge
     static constexpr pin_t PIN_LAT = 9; // RCLK: latches on RISING edge
@@ -73,7 +73,7 @@ RPI Pinouts:
       B2  |22 23|  D
 (LVL) 3V  |#  24|  OE
      CLK  |10  #|  .   (GND)
-     LAT  |9  25|  .
+     LAT  |9  25|  E
 ```
 
 HUB75 Connector pinout:  

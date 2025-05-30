@@ -1,4 +1,10 @@
-import secrets, flask_socketio, flask, threading, gevent
+import secrets, flask_socketio, flask, threading, io
+
+pannelSocket = ""
+def setPannelConnection(pannels):
+    global pannelSocket
+    print("Virtual display got pannel socket")
+    pannelSocket = pannels
 
 def run(port, host="0.0.0.0", allow_cors=False):
     app=flask.Flask(__name__)
@@ -17,6 +23,16 @@ def run(port, host="0.0.0.0", allow_cors=False):
         return flask.send_from_directory("./web/",path)
     socketio=flask_socketio.SocketIO(app, async_mode='threading', cors_allowed_origins=("*" if allow_cors else ""))
 
+    @app.route("/api/<path:path>")
+    def api(path=""):
+        if path == "spotifycover":
+            img_io = io.BytesIO()
+            
+            pannelSocket.packages["Spotify"].currentCover.save(img_io, "PNG")
+            img_io.seek(0)
+            
+            return flask.send_file(img_io, mimetype="image/png")
+        
     print("Starting web server!")
     threading.Thread(target=(lambda:socketio.run(app=app, port=port, host=host, debug=False))).start()
     return socketio

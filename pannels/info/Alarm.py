@@ -1,5 +1,4 @@
 import functions, datetime
-from PIL import Image, ImageDraw
 
 small05 = functions.font["small05"]
 large10 = functions.font["large10"]

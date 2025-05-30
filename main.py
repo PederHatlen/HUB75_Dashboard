@@ -1,9 +1,23 @@
+import sys, datetime
+old_f = sys.stdout
+class F:
+    lastbyteHasNL = True
+    def flush(self): old_f.flush()
+    def write(self, x):
+        old_f.write(f"{datetime.datetime.now().isoformat(sep='[', timespec='milliseconds')}] {x:s}"[10:] if self.lastbyteHasNL else x)
+        self.lastbyteHasNL = "\n" in x
+sys.stdout = F()
+
 import functions
 import Display, virtual_display, menu, pannels, error
-import time, gpiozero, datetime, traceback
+import time, gpiozero, traceback
 from flask import request
 
 settings = {"Autoselecting":True}
+
+virtual_display.setPannelConnection(pannels)
+
+Display.setup(functions.WIDTH, functions.HEIGHT)
 
 # Initialize the webserver/running screen emulator
 socketio = virtual_display.run(1337, allow_cors=True)
@@ -63,6 +77,9 @@ def autoSelector():
         oldSelected = menu.selected
         menu.selected = "Spotify"
         autoSelected = True
+
+    if spotifyWasPlaying and spotifyIsPlaying and menu.selected != "Spotify":
+        autoSelected = False
 
     elif spotifyWasPlaying and not spotifyIsPlaying and autoSelected:
         menu.selected = oldSelected

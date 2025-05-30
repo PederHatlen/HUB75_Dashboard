@@ -6,7 +6,10 @@ PATH = str(pathlib.Path(__file__).parent.resolve())
 from sklearn.cluster import KMeans
 from skimage.color import rgb2lab, lab2rgb
 
-HA_LIGHT_IDS = ["light.bordlampe", "light.led_strip_light", "light.taklampe"]
+WIDTH = 64
+HEIGHT = 32
+
+HA_LIGHT_IDS = ["light.bordlampe", "light.wled1", "light.led_strip_light", "light.taklampe"]
 
 asciiTable = "`.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@"
 
@@ -62,7 +65,7 @@ color = {
 }
 
 def getBlankIM():
-    im = Image.new(mode="RGB", size=(64, 32))
+    im = Image.new(mode="RGB", size=(WIDTH, HEIGHT))
     d = ImageDraw.Draw(im)  
     d.fontmode = "1"
     return im, d
@@ -111,7 +114,7 @@ def filter_colors(colors, brightness_threshold=(0.2, 1), saturation_threshold=0.
 # Using K-Means to group into n- clusters of similar colors (default 3)
 # Filtering out too dark/light and low saturated colors, if possible
 # Using LAB colors for more even distribution
-def get_palette(im, n_colors=3, sorting="none"):
+def get_palette(im, n_colors=4, sorting="none"):
     img = np.array(im.convert("RGB"))
     pixels = img.reshape((-1, 3))
     filtered = filter_colors(pixels)

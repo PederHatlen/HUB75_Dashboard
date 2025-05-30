@@ -1,2 +1,2 @@
-from PIL import Image
-def get(): return Image.new(mode="RGB", size=(64, 32))
+from functions import getBlankIM
+def get(): return getBlankIM()[0]
