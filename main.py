@@ -10,12 +10,8 @@ sys.stdout = F()
 
 import functions
 import Display, virtual_display, menu, pannels, error
-import time, gpiozero, traceback
+import time, gpiozero, traceback, threading
 from flask import request
-
-settings = {"Autoselecting":True}
-
-virtual_display.setPannelConnection(pannels)
 
 Display.setup(functions.WIDTH, functions.HEIGHT)
 menu.setup(pannels)
@@ -24,12 +20,20 @@ menu.setup(pannels)
 virtual_display.setup(pannels)
 socketio = virtual_display.run(1337, allow_cors=True)
 
-oldimage = functions.getBlankIM()[0]
+lastSentFrame = functions.getBlankIM()[0]
+
+do_display = True
 
 spotifyWasPlaying = False
 autoSelected = False
 oldSelected = ""
 lastRenderEvent = datetime.datetime.now()
+
+def getHASDisplayStatus():
+    global do_display
+    while True:
+        do_display = functions.HASGetHelperStatus("enable_dashboard_screen")
+        time.sleep(2)
 
 class dial:
     def __init__(self, dialNumber, BTNpin, D1, D2, isMenu = False):
@@ -63,11 +67,12 @@ class dial:
         return render(pannels.packages[menu.selected].get())
 
 def render(im):
-    global oldimage, lastRenderEvent
+    global lastSentFrame, lastRenderEvent
     lastRenderEvent = datetime.datetime.now()
-    if oldimage != im:
-        oldimage = im
-        Display.render(im)
+    if lastSentFrame != im:
+        lastSentFrame = im
+        if do_display: Display.render(im)
+        else: Display.render(functions.getBlankIM()[0])
         return socketio.emit("refresh", functions.PIL2Socket(im))
 
 def autoSelector():
@@ -93,9 +98,13 @@ if __name__ == "__main__":
     dial0 = dial(0, 26, 20, 21, True)
     dial1 = dial(1, 16, 19, 13)
 
+    # Get the status of the display from HAS (Ask if display should be off)
+    displayRunner = threading.Thread(target=getHASDisplayStatus, name="HASDisplayRunner", daemon=True)
+    displayRunner.start()
+
     @socketio.on("connect")
     def onConnect(data=""):
-        socketio.emit("refresh", functions.PIL2Socket(oldimage), to=request.sid)
+        socketio.emit("refresh", functions.PIL2Socket(lastSentFrame), to=request.sid)
 
     @socketio.on('inp')
     def on_connection(data):
@@ -110,11 +119,14 @@ if __name__ == "__main__":
     # Render loop
     while True:
         start = time.time()
-        if settings["Autoselecting"]: autoSelector()
+        autoSelector()
 
         if menu.active: render(menu.get())
         else:
             try: render(pannels.packages[menu.selected].get())
+            except KeyboardInterrupt as E:
+                print("Keyboard interrupt!")
+                break
             except Exception as e:
                 print(f"Error: {e}", traceback.format_exc())
                 render(error.get())
@@ -122,5 +134,15 @@ if __name__ == "__main__":
         # print(f"Computation time: {round(time.time() - start, 3)}s") 
         # compTime = round(time.time() - start, 3)
         # if compTime >= 0.1: print(f"over: {compTime}")
+        try:
+            time.sleep(0.1 - min(0.05, round(time.time() - start, 3)))
+        except KeyboardInterrupt as E:
+            print("Keyboard interrupt!")
+            break
 
-        time.sleep(0.1 - min(0.05, round(time.time() - start, 3)))
+    dial0.BTN.close()
+    dial0.DIAL.close()
+    dial1.BTN.close()
+    dial1.DIAL.close()
+
+    print("Stopping...")
