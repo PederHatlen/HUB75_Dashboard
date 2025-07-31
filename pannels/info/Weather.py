@@ -4,10 +4,8 @@ from datetime import datetime, timezone, timedelta
 
 small05 = functions.font["small05"]
 
-settings = {
-    "lat":63.4224,
-    "long":10.4320
-}
+LATITUDE  = 63.4224
+LONGITUDE = 10.4320
 
 # Static variables
 UTC = timezone.utc
@@ -63,7 +61,7 @@ def get_data():
         return cach
 
     headers = {'User-Agent':'https://github.com/PederHatlen/MatrixDashboard email:pederhatlen@gmail.com',}
-    response = requests.get(f"https://api.met.no/weatherapi/locationforecast/2.0/complete?lat={round(settings['lat'],4)}&lon={round(settings['long'],4)}",headers=headers)
+    response = requests.get(f"https://api.met.no/weatherapi/locationforecast/2.0/complete?lat={round(LATITUDE,4)}&lon={round(LONGITUDE,4)}",headers=headers)
 
     try: expires = datetime.strptime(response.headers["Expires"][:-4], "%a, %d %b %Y %H:%M:%S").replace(tzinfo=UTC)
     except Exception as E:

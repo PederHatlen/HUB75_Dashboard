@@ -1,14 +1,16 @@
-import secrets, flask_socketio, flask, threading, io
+import secrets, flask_socketio, flask, threading, io, logging
 
 pannelSocket = ""
-def setPannelConnection(pannels):
+def setup(pannels):
     global pannelSocket
     print("Virtual display got pannel socket")
-    pannelSocket = pannels
+    pannelSocket = pannels.packages
 
 def run(port, host="0.0.0.0", allow_cors=False):
     app=flask.Flask(__name__)
     app.config['SECRET_KEY']=secrets.token_urlsafe(16)
+    logging.getLogger("werkzeug").disabled = True
+    logging.getLogger("geventwebsocket.handler").disabled = True
 
     @app.route("/v")
     def viewer():return flask.send_file("./web/viewer.html")
@@ -28,11 +30,13 @@ def run(port, host="0.0.0.0", allow_cors=False):
         if path == "spotifycover":
             img_io = io.BytesIO()
             
-            pannelSocket.packages["Spotify"].currentCover.save(img_io, "PNG")
+            if pannelSocket == "": return flask.abort(500)
+
+            pannelSocket["Spotify"].currentCover.save(img_io, "PNG")
             img_io.seek(0)
             
             return flask.send_file(img_io, mimetype="image/png")
         
     print("Starting web server!")
-    threading.Thread(target=(lambda:socketio.run(app=app, port=port, host=host, debug=False))).start()
+    threading.Thread(name="SocketIO server", target=(lambda:socketio.run(app=app, port=port, host=host, debug=False, log_output=False)), daemon=True).start()
     return socketio

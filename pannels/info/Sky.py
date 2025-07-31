@@ -119,9 +119,6 @@ def btn():
 def get():
     global oldim, fn_last, dayoffset
     
-    # if (fn - fn_last) < 10: return PIL2frame(oldim)
-    # fn_last = fn
-    
     im = Image.new(mode="RGB", size=(64, 32))
     d = ImageDraw.Draw(im, mode="RGBA")
     now = datetime.datetime.now() + datetime.timedelta(days=dayoffset) # Scrub through the year

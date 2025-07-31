@@ -18,8 +18,10 @@ settings = {"Autoselecting":True}
 virtual_display.setPannelConnection(pannels)
 
 Display.setup(functions.WIDTH, functions.HEIGHT)
+menu.setup(pannels)
 
 # Initialize the webserver/running screen emulator
+virtual_display.setup(pannels)
 socketio = virtual_display.run(1337, allow_cors=True)
 
 oldimage = functions.getBlankIM()[0]
