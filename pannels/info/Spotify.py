@@ -12,7 +12,7 @@ You need a Spotify developer app (https://developer.spotify.com/dashboard)
 Get a refresh token, client id, and client secret
     The two last can be retrieved from the spotify app you have made
     You can get a refresh token by completing the Oauth2 initiation ritual
-all these needs to be added to the json file "spotifysecrets.json" in the root of the project (where the main.py file is)
+all these needs to be added to the json file "secrets.json" in the root of the project (where the main.py file is)
 
 """
 
@@ -134,7 +134,7 @@ def get_data():
         oldCover = tempCoverURL
         HAIsUpdated = False
         albumColors = get_palette(covers[tempCoverURL]["large"], PALETTESIZE, "lightness")
-        Thread(target=functions.sendImageToESP, args=(covers[tempCoverURL]["large"], "http://192.168.86.172/img")).start()
+        Thread(target=(lambda: functions.sendImageToESP(covers[tempCoverURL]["large"]))).start()
         
     if not HAIsUpdated and functions.HASGetHelperStatus("do_follow_spotify"):
         HAIsUpdated = True
@@ -142,6 +142,8 @@ def get_data():
     
     # Making avaleable only when completely loaded
     coverURL = tempCoverURL
+    
+    if not currentlyPlaying["is_playing"]: Thread(target=functions.ESPScreen, args=["clear"]).start()
     
     # print(currentlyPlaying)
     data["playing"] = currentlyPlaying["is_playing"]
