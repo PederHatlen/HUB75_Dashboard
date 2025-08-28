@@ -25,8 +25,9 @@
             <span class="material-symbols-outlined" onclick="s.emit('inp', {'dir':'1R'})">rotate_right</span>
         </div>
         <span class="material-symbols-outlined" onclick="document.body.requestFullscreen()">fullscreen</span>
-
+        <span class="material-symbols-outlined" onclick="window.open('about:blank','image from canvas').document.write('<img src=\''+document.querySelector('canvas').toDataURL('image/png')+'\'/>');">save</span>
     </div>
+</span>
     <div>Frametime:&nbsp;<span id="frametime"></span>ms &nbsp;&nbsp; CompTime:&nbsp;<span id="comptime"></span>ms</div>
     <script>
         var ctx = document.querySelector("canvas").getContext("2d");
@@ -39,9 +40,8 @@
         s.on("refresh",img=>{
             document.getElementById("frametime").innerHTML = Math.round(performance.now() - prevFrame);
             prevFrame = performance.now()
-            ctx.clearRect(0,0,640,320);
-            // ctx.fillStyle = "#111";
-            // ctx.fillRect(0,0,640,320);
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0,0,640,320);
             for(let x in img){
                 for(let y in img[x]){
                     if(img[x][y] == "#000000") continue;
