@@ -32,7 +32,11 @@ lastRenderEvent = datetime.datetime.now()
 def getHASDisplayStatus():
     global do_display
     while True:
+        old = do_display
         do_display = functions.HASGetHelperStatus("enable_dashboard_screen")
+        
+        if old != do_display:
+            threading.Thread(target=(lambda: functions.ESPScreen(f"screen/{'on' if do_display else 'off'}"))).start()
         time.sleep(2)
 
 class dial:
