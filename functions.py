@@ -1,17 +1,13 @@
 import pathlib, requests, json, base64
 import numpy as np
 from PIL import ImageFont, Image, ImageDraw
+
+with open("./secrets.json", "r") as fi: secrets = json.load(fi)
+
+WIDTH   = 64
+HEIGHT  = 32
+
 PATH = str(pathlib.Path(__file__).parent.resolve())
-
-WIDTH = 64
-HEIGHT = 32
-
-HA_LIGHT_IDS = ["light.bordlampe", "light.wled1", "light.led_strip_light", "light.taklampe"]
-
-asciiTable = "`.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@"
-
-with open("./secrets.json", "r") as fi:
-    secrets = json.load(fi)
 
 font = {
     "small05": ImageFont.truetype(f"{PATH}/fonts/small05.ttf", 5),
@@ -56,30 +52,39 @@ def hex2rgb(hex):
 def PIL2Socket(im): return [[rgb2hex(y) for y in x] for x in np.array(im).tolist()]
 
 def HASGetHelperStatus(helperID):
-    # print("Getting status from HA")
+    has_complete = ["HAS" in secrets, "access_token" in secrets["has"], "ip" in secrets["has"]]
+    if not all(has_complete): return False
+    
     try:
-        headers = {"Authorization": f"Bearer {secrets['homeassistant']['access_token']}","content-type": "application/json",}
-        return requests.get(f"http://127.0.0.1:8123/api/states/input_boolean.{helperID}", headers=headers).json()["state"] == "on"
+        headers = {"Authorization": f"Bearer {secrets['HAS']['access_token']}","content-type": "application/json",}
+        return requests.get(f"http://{secrets['HAS']['ip']}/api/states/input_boolean.{helperID}", headers=headers).json()["state"] == "on"
     except Exception as E:
         print("Couldn't contact HAS")
         return False
 
 def setHaColors(colors, transition = 1):
+    complete = ["HAS" in secrets, "access_token" in secrets["has"], "light_ids" in secrets["has"], "ip" in secrets["has"]]
+    if not all(complete): return False
+    
     try:
-        headers = {"Authorization": f"Bearer {secrets['homeassistant']['access_token']}","content-type": "application/json",}
-        for i in range(len(HA_LIGHT_IDS)):
-            data = {"entity_id":HA_LIGHT_IDS[i], "rgb_color":colors[i%len(colors)], "transition": transition}
+        headers = {"Authorization": f"Bearer {secrets['HAS']['access_token']}","content-type": "application/json",}
+        for i in range(len(secrets['HAS']['light_ids'])):
+            data = {"entity_id":secrets['HAS']['light_ids'][i], "rgb_color":colors[i%len(colors)], "transition": transition}
+            resp = requests.post(f"http://{secrets['HAS']['ip']}/api/services/light/turn_on", headers=headers, json=data)
             print(f"Setting {data['entity_id']} to {data['rgb_color']}")
-            resp = requests.post("http://127.0.0.1:8123/api/services/light/turn_on", headers=headers, json=data)
             if resp.status_code != 200: print(f"Error {resp.status_code}")
     except Exception as E:
         print("Couldn't set colors with HAS")
 
-def sendImageToESP(im, host):
+def ESPScreen(command):
+    if not all(["ESP" in secrets, "ip" in secrets["ESP"]]): return False
+    requests.get(f"http://{secrets['ESP']['IP']}/{command}")
+    
+def sendImageToESP(im):
+    if not all(["ESP" in secrets, "ip" in secrets["ESP"]]): return False
     try: 
         b64 = base64.b64encode(np.array(im.convert('RGB'), dtype=np.uint8).tobytes()).decode("utf-8")
-        # print(b64, len(b64))
-        r = requests.post(host,headers={"Content-Type": "text/plain"},data=b64)
+        r = requests.post(f"http://{secrets['ESP']['IP']}/img",headers={"Content-Type": "text/plain"},data=b64)
         if r.status_code == 200: print(f"Image sent to ESP sucessfully!")
         else: print(f"Got response while sending image to ESP: {r.status_code}, {r.text}")
     except Exception as E: print(f"Could not send image to ESP")
