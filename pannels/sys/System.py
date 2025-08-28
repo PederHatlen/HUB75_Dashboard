@@ -1,10 +1,7 @@
-import functions, docker, os, psutil
+import functions, os, psutil
 from functions import color
 
 small05 = functions.font["small05"]
-
-isRoot = (os.geteuid() == 0)
-if isRoot: client = docker.from_env()
 
 oldframe = ""
 fn = 0
@@ -59,12 +56,6 @@ def get():
     for p in graph:
         if len(graph[p]) > 32: graph[p] = graph[p][-32:]
         d.line([(i+32, graph[p][i]) for i in range(len(graph[p]))], fill=graphColors[p])
-
-    if isRoot:
-        d.text((0, 27), "HA", fill="#fff", font=small05)
-        has = client.containers.get("homeassistant").attrs["State"]["Running"]
-        if has: d.text((24,27), "UP", font=small05, fill=color["green"])
-        else: d.text((13,27), "DOWN", font=small05, fill=color["red"])
 
     oldframe = im
     return im
