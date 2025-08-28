@@ -1,52 +1,63 @@
 # Matrix LED display - Dashboard
 
-This is a system meant to be run on a matrix LED display connected to something like the Raspberrypi.  
-It is under development, and i have not implemented the acctuall display part yet (i havent received it yet).  
-There is however a verry basic (and probably insecure) simulator/viewer implemented.  
-My display is 64x32, It works good, havent made my pannels scaleable but shouldnt be hard to implement.
+This is a dashboard system used to display information/data using a HUB-75 display and a RPI 5.
+I am uing the adafruit Piomatter which offers verry high performance of HUB-75 displays using PIO, which is sadly not compatible with Earlier RPI models.  
+Included is also a basic web platform for viewing what is rendered in realtime.
 
-## NOTE
+## NOTE!!
 
 This is a hobby project, i have not prioritized code optimizations or cleanness.  
 I'm just having fun here : )
 
 ## What you need
 
-* A raspberrypi (tested on RPI-5)
-* Rotary encoders (Can be however manny you want, i use 3 (2 properties, 1 menu))
-* A matrix LED display (available on ebay, aliexpres, etc. for cheap and from waveshare or genneral hobby-electronics stores at less risk)
-    * I use a pitch of P3 (mm between pixels)
-    * 64px x 32px ~ 200mm x 100mm
+* A raspberrypi 5 (could probably be ported to an earlier model if you have some experience)
+* Rotary encoders (1 Menu and 1 property)
+* A matrix LED display (available on ebay, aliexpres, etc. for cheap and from waveshare or genneral hobby-electronics stores (at a greater price))
+  * I use a pitch of P3 (mm between pixels) (64px x 32px ~ 200mm x 100mm)
 * 3D Printer, or access to one
 
 ## Features
 
-* Spotify Integration (Has to be set up, follow guide not written yet :) )
-* Sun-possition screen (This took a whole day, please use)
+* Fully dynamic pannel integration
+* Pre made pannels (apps):
+  * System (CPU/Temp/RAM)
+  * Spotify Integration (Has to be set up with spotify developer credentials and initiated via the Oauth2 flow)
+  * Sun-possition screen
+  * Weather
+  * Different style Clocks
+  * ++
 * Menu system
-* Make your own pannels!
-  * The rendering function takes a matrix of hex values, PIL Image to Matrix function is also supplied in the functions package.
-  * The pannel is automatically picked up when in the pannels folder.
+
+## Make your own pannels!
+  A template aplication is suplied, the obly thing needed is a function get() that returns a PIL image.  
+  The pannel is automatically picked up when in the pannels folder.
 
 ## Dependencies
 
-gpiozero flask_socketio flask Pillow numpy (astral psutil docker, for sky and system pannels)
+gpiozero flask_socketio flask Pillow numpy (astral psutil, for sky and system pannels)
 
-"""
-python3 -m pip install flask-socketio pillow numpy astral psutil docker
-"""
+``` bash
+python3 -m pip install flask-socketio pillow numpy astral psutil
+```
 
 ## Images
-Spotify Integration (The text scroll, I promise)
-![Spotify Integration](./images/Spotify_Illustration.png)
-Sun Integration
-![Sun Integration](./images/Sun_Illustration.png)
+Spotify Integration (Kmeans algorithm for extracting dominant colors from image, The text scrolls)  
+![Spotify Integration](./images/Spotify.png)  
 
+Menu system, ordered into different categories  
+![Menu system](./images/Menu.png)  
 
-# BarrelJack Pinout:
+Sky information  
+![Sky information display](./images/Sky.png)  
 
-Outside = Long  = GND
-Pin     = short = VC+
+Different Clocks (Norwegian text, can be changed by setting region)  
+![Analog Clock](./images/Clock_Analog.png)  
+![Binary Clock](./images/Clock_Binary.png)  
+![Segmented Clock](./images/Clock_Segment.png)  
+
+The actual display (on the Fontdebug pannel pannel)  
+![Binary Clock](./images/DashboardIRL.jpg)  
 
 # In Adafruit Piomatter
 
