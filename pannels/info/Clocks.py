@@ -47,7 +47,6 @@ def hexFun():
 
     return im
 
-
 def hexBoring():
     now = datetime.datetime.now()
 
@@ -143,7 +142,7 @@ def holo(n, size, depth, color):
 def segment():
     im, d = functions.getBlankIM()
 
-    size, depth = 6, 20
+    size, depth = 6, 3
     width = size+4
 
     x, y = 2, 8
