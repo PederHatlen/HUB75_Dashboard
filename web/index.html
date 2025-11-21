@@ -40,16 +40,11 @@
         s.on("refresh",img=>{
             document.getElementById("frametime").innerHTML = Math.round(performance.now() - prevFrame);
             prevFrame = performance.now()
-            ctx.fillStyle = "#000";
-            ctx.fillRect(0,0,640,320);
-            for(let x in img){
-                for(let y in img[x]){
-                    if(img[x][y] == "#000000") continue;
-                    ctx.fillStyle = img[x][y];
-                    ctx.shadowColor = img[x][y];
-                    if (pixelated){ctx.fillRect(y*10+2,x*10+2,6,6);
-                    }else{ctx.fillRect(y*10,x*10,10,10);}
-                }
+            ctx.clearRect(0,0,640,320);
+            for(let i in img){
+                if(img[i] == [0,0,0]) continue;
+                ctx.fillStyle = ctx.shadowColor = `rgb(${img[i][0]},${img[i][1]},${img[i][2]})`;
+                ctx.fillRect((i%64)*10, Math.floor(i/64)*10,10-4*pixelated,10-4*pixelated);
             }
             document.getElementById("comptime").innerHTML = Math.round(performance.now() - prevFrame);
         });

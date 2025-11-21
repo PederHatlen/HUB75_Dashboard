@@ -41,6 +41,9 @@ gpiozero flask_socketio flask Pillow numpy (astral psutil, for sky and system pa
 python3 -m pip install flask-socketio pillow numpy astral psutil
 ```
 
+[Adafruit_Blinka_Raspberry_Pi5_Piomatter](https://github.com/adafruit/Adafruit_Blinka_Raspberry_Pi5_Piomatter) is used to controll the HUB75 display (only available for RPI5).  
+The version i use is custom compiled with some changes (described under)
+
 ## Images
 Spotify Integration (Kmeans algorithm for extracting dominant colors from image, The text scrolls)  
 ![Spotify Integration](./images/Spotify.png)  
@@ -71,6 +74,8 @@ struct adafruit_matrix_bonnet_pinout {
     static constexpr pin_t PIN_CLK = 10; // SRCLK: clocks on RISING edge
     static constexpr pin_t PIN_LAT = 9; // RCLK: latches on RISING edge
 ```
+
+# Wiring diagram
 
 RPI Pinouts:  
 ```

@@ -1,9 +1,7 @@
-import functions
-
-small05 = functions.font["small05"]
+import properties
 
 def get():
-    im, d = functions.getBlankIM()
-    d.multiline_text((0,0), "Nothing to see \nhere", font=small05)
+    im, d = properties.getBlankIM()
+    d.multiline_text((1,1), "Nothing to see \nhere", font=properties.font[5])
 
     return im

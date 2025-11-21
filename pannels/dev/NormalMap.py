@@ -1,2 +1,2 @@
-import functions, numpy as np, PIL.Image
-def get(): return PIL.Image.fromarray(np.uint8([[[(x*255)//(functions.HEIGHT),(y*255)//(functions.WIDTH),128] for y in range(functions.WIDTH)] for x in range(functions.HEIGHT)])).convert('RGB')
+import properties, numpy as np, PIL.Image
+def get(): return PIL.Image.fromarray(np.uint8([[[(x*255)//(properties.HEIGHT),(y*255)//(properties.WIDTH),128] for y in range(properties.WIDTH)] for x in range(properties.HEIGHT)])).convert('RGB')

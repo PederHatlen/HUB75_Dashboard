@@ -1,8 +1,8 @@
-import functions, requests, json
+import properties, requests, json
 from PIL import Image
 from datetime import datetime, timezone, timedelta
 
-small05 = functions.font["small05"]
+small05 = properties.font[5]
 
 LATITUDE  = 63.4224
 LONGITUDE = 10.4320
@@ -23,21 +23,22 @@ iconsSmall  = {e:Image.open(f"./weatherIcons/{weatherIcons[e]['code']}.png").res
 # iconsSmall  = {e:Image.alpha_composite(bg, Image.open(f"./weatherIcons/{weatherIcons[e]['code']}.png")).resize((15,15), Image.Resampling.HAMMING) for e in weatherIcons.keys()}
 
 # Icons for current events
-LR = [*functions.hex2rgb(functions.color["lightred"]), 255]
-LB = [*functions.hex2rgb(functions.color["lightblue"]), 255]
+LR = [*properties.color_rgb["lightred"], 255]
+LB = [*properties.color_rgb["lightblue"], 255]
 WC, GC, BC = (255,255,255,255), (100,100,100,255), (0,0,0,0)
 
-tempIconR = functions.imFromArr([[LR,LR,BC,BC,BC],[LR,LR,BC,LR,LR],[BC,BC,LR,BC,BC],[BC,BC,LR,BC,BC],[BC,BC,BC,LR,LR]], "RGBA")
-tempIconB = functions.imFromArr([[LB,LB,BC,BC,BC],[LB,LB,BC,LB,LB],[BC,BC,LB,BC,BC],[BC,BC,LB,BC,BC],[BC,BC,BC,LB,LB]], "RGBA")
+tempIconR = properties.imFromArr([[LR,LR,BC,BC,BC],[LR,LR,BC,LR,LR],[BC,BC,LR,BC,BC],[BC,BC,LR,BC,BC],[BC,BC,BC,LR,LR]], "RGBA")
+tempIconB = properties.imFromArr([[LB,LB,BC,BC,BC],[LB,LB,BC,LB,LB],[BC,BC,LB,BC,BC],[BC,BC,LB,BC,BC],[BC,BC,BC,LB,LB]], "RGBA")
 
-rainIcon = functions.imFromArr([[LB,BC,BC,BC,LB],[LB,BC,LB,BC,LB],[BC,BC,LB,BC,LB],[LB,BC,BC,BC,BC],[LB,BC,BC,LB,BC]], "RGBA")
-windIcon = functions.imFromArr([[BC,BC,WC,GC,BC],[GC,GC,WC,GC,BC],[WC,WC,WC,WC,WC],[BC,GC,WC,GC,GC],[BC,GC,WC,BC,BC]], "RGBA")
-covrIcon = functions.imFromArr([[BC,BC,WC,WC,BC],[GC,WC,WC,WC,WC],[WC,WC,WC,WC,WC],[GC,WC,WC,WC,GC]], "RGBA")
+rainIcon = properties.imFromArr([[LB,BC,BC,BC,LB],[LB,BC,LB,BC,LB],[BC,BC,LB,BC,LB],[LB,BC,BC,BC,BC],[LB,BC,BC,LB,BC]], "RGBA")
+windIcon = properties.imFromArr([[BC,BC,WC,GC,BC],[GC,GC,WC,GC,BC],[WC,WC,WC,WC,WC],[BC,GC,WC,GC,GC],[BC,GC,WC,BC,BC]], "RGBA")
+covrIcon = properties.imFromArr([[BC,BC,WC,WC,BC],[GC,WC,WC,WC,WC],[WC,WC,WC,WC,WC],[GC,WC,WC,WC,GC]], "RGBA")
 
 # Global Variables
 expires, dataCuttof = datetime.now(tz=UTC), datetime.now(tz=UTC)
 offsetH, dn = 0, 0
 data = {}
+gettingData = False
 
 # Functions
 def get_data_cuttof(data):
@@ -51,15 +52,17 @@ def get_cached_data():
     except: return {}
 
 def get_data():
-    global expires, dataCuttof
+    global expires, dataCuttof, gettingData
     print("Getting new data")
     cach = get_cached_data()
-    if "expires" in cach and datetime.fromisoformat(cach["expires"]) > datetime.now(tz=UTC):
+    if gettingData or ("expires" in cach and datetime.fromisoformat(cach["expires"]) > datetime.now(tz=UTC)):
         print(f"Using cached data, expires {cach['expires']}")
         expires = datetime.fromisoformat(cach["expires"])
         dataCuttof = get_data_cuttof(cach)
         return cach
-
+    
+    gettingData = True
+    
     headers = {'User-Agent':'https://github.com/PederHatlen/MatrixDashboard email:pederhatlen@gmail.com',}
     response = requests.get(f"https://api.met.no/weatherapi/locationforecast/2.0/complete?lat={round(LATITUDE,4)}&lon={round(LONGITUDE,4)}",headers=headers)
 
@@ -73,6 +76,7 @@ def get_data():
     dataCuttof = get_data_cuttof(data)
 
     with open("./tempWeather.json", "w") as fi: fi.write(json.dumps(data))
+    gettingData = False
     return data
     
 def get_current_hour(t):
@@ -93,12 +97,13 @@ def btn():
 def get():
     global data, expires
 
-    im, d = functions.getBlankIM()
+    im, d = properties.getBlankIM()
+    d.font = properties.font[5]
 
     if datetime.now(tz=UTC) > expires: data = get_data()
     
     if data == {}: 
-        d.text((32, 16), "No data", font=small05, anchor="mm")
+        d.text((32, 16), "No data", anchor="mm")
         return im
 
     now = datetime.now(tz=UTC) + timedelta(hours=offsetH)
@@ -118,14 +123,14 @@ def get():
     if offsetH == 0:
         im.paste(iconLarge, (0, 0), mask=iconLarge)
         im.paste(iconNext, (26, 7), mask=iconNext)
-        d.text((28, 1), "+6H", font=small05, fill=functions.color["orange"])
+        d.text((28, 1), "+6H", fill=properties.color["orange"])
     else:
         im.paste(iconMedium, (1, 5), mask=iconMedium)
         im.paste(iconNext, (25, 9), mask=iconNext)
-        d.text((27, 3), "+6H", font=small05, fill=functions.color["orange"])
-        d.text((1, 0), now.astimezone(datetime.now(timezone.utc).astimezone().tzinfo).strftime("%H:00"), font=small05, fill=functions.color["orange"])
+        d.text((27, 3), "+6H", fill=properties.color["orange"])
+        d.text((1, 0), now.astimezone(datetime.now(timezone.utc).astimezone().tzinfo).strftime("%H:00"), fill=properties.color["orange"])
 
-    d.text((1 if len(description) > 5 else 3, 26), description, font=small05)
+    d.text((1 if len(description) > 5 else 3, 26), description)
 
     # Get current conditions from data
     temp = currentHour["instant"]["details"]["air_temperature"]
@@ -144,10 +149,10 @@ def get():
     # clouds = 100
 
     # Current concitions values
-    d.text((57,  1), str(temp), font=small05, anchor="rt")
-    d.text((57,  9), str(perc), font=small05, anchor="rt")
-    d.text((57, 17), str(wind), font=small05, anchor="rt")
-    d.text((57, 25), str(covr), font=small05, anchor="rt")
+    d.text((57,  1), str(temp), anchor="rt")
+    d.text((57,  9), str(perc), anchor="rt")
+    d.text((57, 17), str(wind), anchor="rt")
+    d.text((57, 25), str(covr), anchor="rt")
 
     # Current concitions icons
     im.paste(tempIconB if temp < 0 else tempIconR, (58, 1), mask=tempIconB)

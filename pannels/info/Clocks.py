@@ -1,4 +1,4 @@
-import functions, datetime, math, locale, random
+import properties, datetime, math, locale, random
 from contextlib import contextmanager
 from PIL import Image, ImageDraw
 
@@ -27,23 +27,29 @@ class stardust:
 
 dust = [stardust(random.randint(0,32)) for i in range(100)]
 
-
 @contextmanager
 def setlocale(name):
     saved = locale.setlocale(locale.LC_ALL)
     try: yield locale.setlocale(locale.LC_ALL, name)
     finally: locale.setlocale(locale.LC_ALL, saved)
 
-small05 = functions.font["small05"]
-
+def basic_digital():
+    now = datetime.datetime.now()
+    
+    im, d = properties.getBlankIM()
+    
+    with setlocale(LOCALE_STRING):
+        d.text((2, 2), f"{now:%H:%M:%S}", "#FFF", properties.font[10])
+        d.text((2, 14), f"{now.strftime('%A')[:3]} {now:%d}. {now.strftime('%B')[:3]}", "#FFF", properties.font[5])
+    return im
 
 def hexFun():
     now = datetime.datetime.now()
     hexTime = f"#{round((now - now.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()*100):0>6X}".upper() # Milliseconds -> Hex
 
-    im, d = functions.getBlankIM()
+    im, d = properties.getBlankIM()
     d.rectangle((0,0,64,32), fill=hexTime)
-    d.text((5,5), hexTime, font=small05, fill=(255,255,255))
+    d.text((5,5), hexTime, font=properties.font[5], fill=(255,255,255))
 
     return im
 
@@ -52,15 +58,15 @@ def hexBoring():
 
     hexTime = f"#{str(now.hour).rjust(2,'0')}{str(now.minute).rjust(2,'0')}{str(now.second).rjust(2,'0')}"  # Clock as color
 
-    im, d = functions.getBlankIM()
+    im, d = properties.getBlankIM()
     d.rectangle((0,0,64,32), fill=hexTime)
-    d.text((5,5), hexTime, font=small05, fill=(255,255,255))
+    d.text((5,5), hexTime, font=properties.font[5], fill=(255,255,255))
 
     return im
 
 ps, gap = 4, 2 # Pixel size, pixel gap
 def binary():
-    im, d = functions.getBlankIM()
+    im, d = properties.getBlankIM()
 
     now = datetime.datetime.now()
     time = list(f"{str(now.hour).rjust(2,'0')}{str(now.minute).rjust(2,'0')}{str(now.second).rjust(2,'0')}")
@@ -75,7 +81,7 @@ def binary():
     return im
 
 def analog():
-    im, d = functions.getBlankIM()
+    im, d = properties.getBlankIM()
 
     now = datetime.datetime.now()
 
@@ -89,7 +95,7 @@ def analog():
 
     for deg in range(0, 360, 30):
         x, y = math.cos(math.radians(deg)), math.sin(math.radians(deg))
-        d.line((round(x*(r-w+1)) + o, round(y*(r-w+2)) + o, round(x*r)+o, round(y*r)+o), functions.color["orange"], 1)
+        d.line((round(x*(r-w+1)) + o, round(y*(r-w+2)) + o, round(x*r)+o, round(y*r)+o), properties.color["orange"], 1)
     for deg in range(0, 360, 90):
         x, y = math.cos(math.radians(deg)), math.sin(math.radians(deg))
         d.line((round(x*(r-w+1)) + o, round(y*(r-w+2)) + o, round(x*r)+o, round(y*r)+o), "#fff", 1)
@@ -98,16 +104,16 @@ def analog():
     minute = (now.minute/60) * 2*math.pi - math.pi/2
     second = (now.second/60) * 2*math.pi - math.pi/2
 
-    d.line((o, o, round(math.cos(hour)*hLen)+o, round(math.sin(hour)*hLen)+o), functions.color["white"], 1)
-    d.line((o, o, round(math.cos(minute)*mLen)+o, round(math.sin(minute)*mLen)+o), functions.color["white"], 1)
-    d.line((o, o, round(math.cos(second)*sLen)+o, round(math.sin(second)*sLen)+o), functions.color["orange"], 1)
+    d.line((o, o, round(math.cos(hour)*hLen)+o, round(math.sin(hour)*hLen)+o), properties.color["white"], 1)
+    d.line((o, o, round(math.cos(minute)*mLen)+o, round(math.sin(minute)*mLen)+o), properties.color["white"], 1)
+    d.line((o, o, round(math.cos(second)*sLen)+o, round(math.sin(second)*sLen)+o), properties.color["orange"], 1)
 
     with setlocale(LOCALE_STRING):
-        d.text((34, 0), now.strftime("%A"), functions.color["orange"], small05)
-        d.text((34, 8), now.strftime("%-d %b")[:-1], functions.color["white"], small05)
-        d.text((34, 16), f"Uke {str(now.isocalendar()[1]).rjust(2, '0')}", functions.color["white"], small05)
+        d.text((34, 0), now.strftime("%A"), properties.color["orange"], properties.font[5])
+        d.text((34, 8), now.strftime("%-d %b")[:-1], properties.color["white"], properties.font[5])
+        d.text((34, 16), f"Uke {str(now.isocalendar()[1]).rjust(2, '0')}", properties.color["white"], properties.font[5])
 
-    # d.point((15, 15), functions.color["orange"])
+    # d.point((15, 15), prop.color["orange"])
 
     # d.point((*[(x*2, 0) for x in range(32)], *[(0, y*2) for y in range(16)]))
 
@@ -140,7 +146,7 @@ def holo(n, size, depth, color):
 
 
 def segment():
-    im, d = functions.getBlankIM()
+    im, d = properties.getBlankIM()
 
     size, depth = 6, 3
     width = size+4
@@ -179,7 +185,7 @@ def segment():
 
 
 selector = 0
-total = 4
+total = 5
 
 def dial(e):
     global selector, total
@@ -187,10 +193,11 @@ def dial(e):
     elif e == "1L": selector = (selector-1 if selector > 0 else total)
 
 def get():
-    if selector == 0: return analog()
-    if selector == 1: return binary()
-    if selector == 2: return hexBoring()
-    if selector == 3: return hexFun()
-    if selector == 4: return segment()
+    if selector == 0: return basic_digital()
+    if selector == 1: return analog()
+    if selector == 2: return binary()
+    if selector == 3: return hexBoring()
+    if selector == 4: return hexFun()
+    if selector == 5: return segment()
 
-    return analog()
+    return basic_digital()

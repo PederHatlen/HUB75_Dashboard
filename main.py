@@ -1,43 +1,6 @@
-import sys, datetime
-old_f = sys.stdout
-class F:
-    lastbyteHasNL = True
-    def flush(self): old_f.flush()
-    def write(self, x):
-        old_f.write(f"{datetime.datetime.now().isoformat(sep='[', timespec='milliseconds')}] {x:s}"[10:] if self.lastbyteHasNL else x)
-        self.lastbyteHasNL = "\n" in x
-sys.stdout = F()
-
-import functions
-import Display, virtual_display, menu, pannels, error
-import time, gpiozero, traceback, threading
-from flask import request
-
-Display.setup(functions.WIDTH, functions.HEIGHT)
-menu.setup(pannels)
-
-# Initialize the webserver/running screen emulator
-virtual_display.setup(pannels)
-socketio = virtual_display.run(1337, allow_cors=True)
-
-lastSentFrame = functions.getBlankIM()[0]
-
-do_display = True
-
-spotifyWasPlaying = False
-autoSelected = False
-oldSelected = ""
-lastRenderEvent = datetime.datetime.now()
-
-def getHASDisplayStatus():
-    global do_display
-    while True:
-        old = do_display
-        do_display = functions.HASGetHelperStatus("enable_dashboard_screen")
-        
-        if old != do_display:
-            threading.Thread(target=(lambda: functions.ESPScreen(f"screen/{'on' if do_display else 'off'}"))).start()
-        time.sleep(2)
+import properties, display, virtual_display, menu, pannels, error
+import time, gpiozero, traceback, threading, json, re
+from websockets.sync.client import connect
 
 class dial:
     def __init__(self, dialNumber, BTNpin, D1, D2, isMenu = False):
@@ -50,7 +13,7 @@ class dial:
         self.BTN.when_activated = self.btn
         self.DIAL.when_rotated_clockwise = (lambda: self.dial("R"))
         self.DIAL.when_rotated_counter_clockwise = (lambda: self.dial("L"))
-    
+
     def dial(self, dir):
         if menu.active:
             menu.dial(f"{self.dialNumber}{dir}")
@@ -59,94 +22,101 @@ class dial:
         try: pannels.packages[menu.selected].dial(f"{self.dialNumber}{dir}")
         except AttributeError: return print(f"{menu.selected} doesn't support dial")
         return render(pannels.packages[menu.selected].get())
-    
+
     def btn(self):
         if self.isMenu:
             menu.active = not menu.active
             if menu.active: render(menu.get())
             return
-        
+
         try: pannels.packages[menu.selected].btn()
         except AttributeError: return print(f"{menu.selected} doesn't support buttons")
         return render(pannels.packages[menu.selected].get())
 
-def render(im):
-    global lastSentFrame, lastRenderEvent
-    lastRenderEvent = datetime.datetime.now()
-    if lastSentFrame != im:
-        lastSentFrame = im
-        if do_display: Display.render(im)
-        else: Display.render(functions.getBlankIM()[0])
-        return socketio.emit("refresh", functions.PIL2Socket(im))
+    def close(self):
+        self.BTN.close()
+        self.DIAL.close()
 
+ws, ha_data = "", {"display_status":True, "spotify_lighting": False}
+def ha_data_thread():
+    global ws, prop
+    while True:
+        try:
+            ws = connect("ws://peder-rpi:8123/api/websocket")
+            print("Connected to WebSocket")
+            while True:
+                time.sleep(0.25)
+                raw_message = ws.recv(timeout=None)
+                message = json.loads(raw_message)
+                if "type" not in message: continue
+                if message["type"] == "auth_required": ws.send(json.dumps({"type": "auth", "access_token": properties.secrets["has"]["access_token"]}))
+                # if message["type"] == "result": print(raw_message)
+                if message["type"] == "auth_ok":
+                    print("Successfully authorized with HA")
+                    ws.send("""{"id": 1, "type": "subscribe_entities", "entity_ids": ["input_boolean.enable_dashboard_screen"]}""")
+                    ws.send("""{"id": 2, "type": "subscribe_entities", "entity_ids": ["input_boolean.do_follow_spotify"]}""")
+                if message["type"] == "event" and "event" in message:
+                    s = re.search(r'(?<=\"s\":\")(?:on|off)(?=\",\")', raw_message)
+                    if s and message["id"] == 1: ha_data["display_status"] = (s[0] == "on")
+                    elif s and message["id"] == 2: ha_data["spotify_lighting"] = (s[0] == "on")
+        except Exception as e: print(f"Disconnected from HA, trying to reconnect in 5s {e}")
+        if ws != "": ws.close(code=1000, reason="Something messed up here sry")
+        time.sleep(5)
+
+def render(im):
+    global ha_data
+    if ha_data["display_status"]: display.render(im)
+    else: display.render(properties.getBlankIM()[0])
+    virtual_display.render(im)
+
+spotifyWasPlaying = False
+oldSelected = ""
 def autoSelector():
-    global spotifyWasPlaying, menu, oldSelected, autoSelected
+    global spotifyWasPlaying, menu, oldSelected
+    if pannels.packages["Spotify"].data == {}: return
 
     spotifyIsPlaying = pannels.packages["Spotify"].data["playing"]
 
     if not spotifyWasPlaying and spotifyIsPlaying:
         oldSelected = menu.selected
         menu.selected = "Spotify"
-        autoSelected = True
 
-    if spotifyWasPlaying and spotifyIsPlaying and menu.selected != "Spotify":
-        autoSelected = False
-
-    elif spotifyWasPlaying and not spotifyIsPlaying and autoSelected:
+    elif spotifyWasPlaying and not spotifyIsPlaying and menu.selected == "Spotify":
         menu.selected = oldSelected
-    
+
     spotifyWasPlaying = spotifyIsPlaying
 
-if __name__ == "__main__":
+if __name__ == "__main__":   
+    frameTime = 1/properties.TARGET_FPS
+    
     # Dials and buttons
-    dial0 = dial(0, 26, 20, 21, True)
-    dial1 = dial(1, 16, 19, 13)
+    dials = [dial(0, 26, 20, 21, True), dial(1, 16, 19, 13)]
 
-    # Get the status of the display from HAS (Ask if display should be off)
-    displayRunner = threading.Thread(target=getHASDisplayStatus, name="HASDisplayRunner", daemon=True)
-    displayRunner.start()
+    threading.Thread(target=ha_data_thread, name="HAS Websocket", daemon=True).start()
 
-    @socketio.on("connect")
-    def onConnect(data=""):
-        socketio.emit("refresh", functions.PIL2Socket(lastSentFrame), to=request.sid)
-
-    @socketio.on('inp')
-    def on_connection(data):
-        print(f"Input from virtual display: {data}") #type:ignore
-        if "dir" in data: 
-            if data["dir"][0] == "0": dial0.dial(data["dir"][1])
-            elif data["dir"][0] == "1": dial1.dial(data["dir"][1])
-        elif "btn" in data:
-            if data["btn"] == 0: dial0.btn()
-            elif data["btn"] == 1: dial1.btn()
+    display.setup(properties.WIDTH, properties.HEIGHT)
+    menu.setup(pannels)
+    virtual_display.setup(1337, dials=dials, allow_cors=True)
+    
+    for p in pannels.packages:
+        try: pannels.packages[p].ha_data_interface(ha_data)
+        except AttributeError: continue
 
     # Render loop
     while True:
         start = time.time()
         autoSelector()
 
-        if menu.active: render(menu.get())
-        else:
-            try: render(pannels.packages[menu.selected].get())
-            except KeyboardInterrupt as E:
-                print("Keyboard interrupt!")
-                break
-            except Exception as e:
-                print(f"Error: {e}", traceback.format_exc())
-                render(error.get())
+        try: render(menu.get() if menu.active else pannels.packages[menu.selected].get())
+        except KeyboardInterrupt as E: break
+        except Exception as e:
+            print(f"Error: {e}", traceback.format_exc())
+            render(error.get())
+            time.sleep(2)
 
-        # print(f"Computation time: {round(time.time() - start, 3)}s") 
-        # compTime = round(time.time() - start, 3)
-        # if compTime >= 0.1: print(f"over: {compTime}")
-        try:
-            time.sleep(0.1 - min(0.05, round(time.time() - start, 3)))
-        except KeyboardInterrupt as E:
-            print("Keyboard interrupt!")
-            break
+        compTime = time.time() - start
+        # print(compTime)
+        time.sleep(frameTime - min(frameTime-0.01, compTime))
 
-    dial0.BTN.close()
-    dial0.DIAL.close()
-    dial1.BTN.close()
-    dial1.DIAL.close()
-
+    for d in dials: d.close()
     print("Stopping...")

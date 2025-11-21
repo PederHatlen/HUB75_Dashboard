@@ -1,10 +1,7 @@
-import functions, datetime, random
-import numpy as np
+import properties, datetime, random
 import astral.sun, astral.moon # Cheating
 from PIL import Image, ImageDraw
 from math import radians, sin, cos, atan2, asin, degrees, pi
-
-small05 = functions.font["small05"]
 
 DATE_COLOR    = "#7BD3EA"
 SUNRISE_COLOR = (255, 168, 92)
@@ -19,20 +16,20 @@ WC = (255, 255, 255)
 
 # Moon phase images
 moonPhases = {
-    0:functions.imFromArr([[BC,GC,GC,GC,GC,BC],[GC,GC,GC,GC,GC,GC],[GC,GC,GC,GC,GC,GC],[GC,GC,GC,GC,GC,GC],[GC,GC,GC,GC,GC,GC],[BC,GC,GC,GC,GC,BC]]),
-    1:functions.imFromArr([[BC,GC,GC,WC,WC,BC],[GC,GC,GC,GC,WC,WC],[GC,GC,GC,GC,GC,WC],[GC,GC,GC,GC,GC,WC],[GC,GC,GC,GC,WC,WC],[BC,GC,GC,WC,WC,BC]]),
-    2:functions.imFromArr([[BC,GC,GC,WC,WC,BC],[GC,GC,GC,WC,WC,WC],[GC,GC,GC,WC,WC,WC],[GC,GC,GC,WC,WC,WC],[GC,GC,GC,WC,WC,WC],[BC,GC,GC,WC,WC,BC]]),
-    3:functions.imFromArr([[BC,GC,GC,WC,WC,BC],[GC,GC,WC,WC,WC,WC],[GC,WC,WC,WC,WC,WC],[GC,WC,WC,WC,WC,WC],[GC,GC,WC,WC,WC,WC],[BC,GC,GC,WC,WC,BC]]),
-    4:functions.imFromArr([[BC,WC,WC,WC,WC,BC],[WC,WC,WC,WC,WC,WC],[WC,WC,WC,WC,WC,WC],[WC,WC,WC,WC,WC,WC],[WC,WC,WC,WC,WC,WC],[BC,WC,WC,WC,WC,BC]]),
-    5:functions.imFromArr([[BC,WC,WC,GC,GC,BC],[WC,WC,WC,WC,GC,GC],[WC,WC,WC,WC,WC,GC],[WC,WC,WC,WC,WC,GC],[WC,WC,WC,WC,GC,GC],[BC,WC,WC,GC,GC,BC]]),
-    6:functions.imFromArr([[BC,WC,WC,GC,GC,BC],[WC,WC,WC,GC,GC,GC],[WC,WC,WC,GC,GC,GC],[WC,WC,WC,GC,GC,GC],[WC,WC,WC,GC,GC,GC],[BC,WC,WC,GC,GC,BC]]),
-    7:functions.imFromArr([[BC,WC,WC,GC,GC,BC],[WC,WC,GC,GC,GC,GC],[WC,GC,GC,GC,GC,GC],[WC,GC,GC,GC,GC,GC],[WC,WC,GC,GC,GC,GC],[BC,WC,WC,GC,GC,BC]])
+    0:properties.imFromArr([[BC,GC,GC,GC,GC,BC],[GC,GC,GC,GC,GC,GC],[GC,GC,GC,GC,GC,GC],[GC,GC,GC,GC,GC,GC],[GC,GC,GC,GC,GC,GC],[BC,GC,GC,GC,GC,BC]]),
+    1:properties.imFromArr([[BC,GC,GC,WC,WC,BC],[GC,GC,GC,GC,WC,WC],[GC,GC,GC,GC,GC,WC],[GC,GC,GC,GC,GC,WC],[GC,GC,GC,GC,WC,WC],[BC,GC,GC,WC,WC,BC]]),
+    2:properties.imFromArr([[BC,GC,GC,WC,WC,BC],[GC,GC,GC,WC,WC,WC],[GC,GC,GC,WC,WC,WC],[GC,GC,GC,WC,WC,WC],[GC,GC,GC,WC,WC,WC],[BC,GC,GC,WC,WC,BC]]),
+    3:properties.imFromArr([[BC,GC,GC,WC,WC,BC],[GC,GC,WC,WC,WC,WC],[GC,WC,WC,WC,WC,WC],[GC,WC,WC,WC,WC,WC],[GC,GC,WC,WC,WC,WC],[BC,GC,GC,WC,WC,BC]]),
+    4:properties.imFromArr([[BC,WC,WC,WC,WC,BC],[WC,WC,WC,WC,WC,WC],[WC,WC,WC,WC,WC,WC],[WC,WC,WC,WC,WC,WC],[WC,WC,WC,WC,WC,WC],[BC,WC,WC,WC,WC,BC]]),
+    5:properties.imFromArr([[BC,WC,WC,GC,GC,BC],[WC,WC,WC,WC,GC,GC],[WC,WC,WC,WC,WC,GC],[WC,WC,WC,WC,WC,GC],[WC,WC,WC,WC,GC,GC],[BC,WC,WC,GC,GC,BC]]),
+    6:properties.imFromArr([[BC,WC,WC,GC,GC,BC],[WC,WC,WC,GC,GC,GC],[WC,WC,WC,GC,GC,GC],[WC,WC,WC,GC,GC,GC],[WC,WC,WC,GC,GC,GC],[BC,WC,WC,GC,GC,BC]]),
+    7:properties.imFromArr([[BC,WC,WC,GC,GC,BC],[WC,WC,GC,GC,GC,GC],[WC,GC,GC,GC,GC,GC],[WC,GC,GC,GC,GC,GC],[WC,WC,GC,GC,GC,GC],[BC,WC,WC,GC,GC,BC]])
 }
 
 # LC = SUN_COLOR
 # RAY = (102, 96, 47)
 # HC = (68, 68, 68)
-# sunrise_icon = functions.imFromArr([
+# sunrise_icon = properties.imFromArr([
 #     [BC,BC,LC,BC,BC],
 #     [BC,LC,BC,LC,BC],
 #     [BC,BC,BC,BC,BC],
@@ -46,7 +43,7 @@ RAY = LC
 # RAY = (102, 96, 47)
 HC  = (68, 68, 68)
 BC  = (0, 0, 0)
-sunrise_icon = functions.imFromArr([
+sunrise_icon = properties.imFromArr([
     # [BC,BC,BC,BC,BC,BC,BC],
     [BC,BC,BC,RAY,BC,BC,BC],
     [BC,BC,RAY,BC,RAY,BC,BC],
@@ -59,7 +56,7 @@ sunrise_icon = functions.imFromArr([
 
 # LC  = SUNSET_COLOR
 # RAY = LC
-sunset_icon = functions.imFromArr([
+sunset_icon = properties.imFromArr([
     [BC,BC,RAY,BC,RAY,BC,BC],
     [BC,BC,BC,RAY,BC,BC,BC],
     [BC,BC,BC,BC,BC,BC,BC],
@@ -68,7 +65,7 @@ sunset_icon = functions.imFromArr([
     [HC,HC,HC,HC,HC,HC,HC],
 ])
 
-# arrow2 = functions.imFromArr([
+# arrow2 = properties.imFromArr([
 #     [BC,BC,LC,BC,BC],
 #     [BC,LC,LC,LC,BC],
 #     [LC,LC,LC,LC,LC],
@@ -144,7 +141,7 @@ def get():
     d.circle(sunPos, 4, (*SUN_COLOR, 10))
     d.circle(sunPos, 3, (*SUN_COLOR, 25))
     d.circle(sunPos, 2, (*SUN_COLOR, 75))
-    d.rectangle(((sunPos[0]-1, sunPos[1]-1), (sunPos[0]+1, sunPos[1]+1)), fill=functions.color["yellow"])
+    d.rectangle(((sunPos[0]-1, sunPos[1]-1), (sunPos[0]+1, sunPos[1]+1)), fill=properties.color["yellow"])
     d.point(sunPos, "#FFF")
 
     moonPos = (54, 1)
@@ -152,9 +149,9 @@ def get():
     d.ellipse(((moonPos[0]-1, moonPos[1]-1), (moonPos[0]+6, moonPos[1]+6)), (*MOON_COLOR, 19))
     d.ellipse(((moonPos[0]-2, moonPos[1]-2), (moonPos[0]+7, moonPos[1]+7)), (*MOON_COLOR, 5))
 
-    d.text((1,1), str(now.strftime("%b %d")), MOON_COLOR, small05)
-    d.text((1, 26), str(sunriseDT), SUN_COLOR, small05)
-    d.text((46, 26), str(sunsetDT), SUN_COLOR, small05)
+    d.text((1,1), str(now.strftime("%b %d")), MOON_COLOR, properties.font[5])
+    d.text((1, 26), str(sunriseDT), SUN_COLOR, properties.font[5])
+    d.text((46, 26), str(sunsetDT), SUN_COLOR, properties.font[5])
 
     im.paste(sunrise_icon, (20, 26))
     im.paste(sunset_icon, (37, 26))

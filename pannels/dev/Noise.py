@@ -1,2 +1,2 @@
-import functions, random, numpy as np, PIL.Image
-def get(): return PIL.Image.fromarray(np.uint8([[[random.randint(0,255), random.randint(0,255), random.randint(0,255)] for y in range(functions.WIDTH)] for x in range(functions.HEIGHT)])).convert('RGB')
+import properties, random, numpy as np, PIL.Image
+def get(): return PIL.Image.fromarray(np.uint8([[[random.randint(0,255), random.randint(0,255), random.randint(0,255)] for y in range(properties.WIDTH)] for x in range(properties.HEIGHT)])).convert('RGB')

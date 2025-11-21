@@ -1,12 +1,15 @@
-import secrets, flask_socketio, flask, threading, io, logging
+import secrets, flask_socketio, flask, threading, logging
 
-pannelSocket = ""
-def setup(pannels):
-    global pannelSocket
-    print("Virtual display got pannel socket")
-    pannelSocket = pannels.packages
+socketio, lastSentFrame = "", ""
 
-def run(port, host="0.0.0.0", allow_cors=False):
+def render(im):
+    global lastSentFrame
+    if lastSentFrame != im:
+        lastSentFrame = im
+        socketio.emit("refresh", list(im.getdata()))
+
+def setup(port, dials="", host="0.0.0.0", allow_cors=False):
+    global socketio
     app=flask.Flask(__name__)
     app.config['SECRET_KEY']=secrets.token_urlsafe(16)
     logging.getLogger("werkzeug").disabled = True
@@ -23,20 +26,23 @@ def run(port, host="0.0.0.0", allow_cors=False):
     def index(path="index.html"):
         if "." not in path: path = f"{path}.html"
         return flask.send_from_directory("./web/",path)
+
     socketio=flask_socketio.SocketIO(app, async_mode='threading', cors_allowed_origins=("*" if allow_cors else ""))
 
-    @app.route("/api/<path:path>")
-    def api(path=""):
-        if path == "spotifycover":
-            img_io = io.BytesIO()
-            
-            if pannelSocket == "": return flask.abort(500)
+    @socketio.on("connect")
+    def onConnect(data=""):
+        if lastSentFrame == "": return
+        socketio.emit("refresh",list(lastSentFrame.getdata()), to=flask.request.sid)
+    
+    @socketio.on('inp')
+    def on_connection(data):
+        print(f"Input from virtual display: {data}") #type:ignore
+        if dials != "":
+            if "dir" in data and data["dir"][0] in [0, 1]: dials[data["dir"][0]].dial(data["dir"][1])
+            elif "btn" in data and data["btn"] in [0, 1]: dials[data["btn"]].btn()
 
-            pannelSocket["Spotify"].currentCover.save(img_io, "PNG")
-            img_io.seek(0)
-            
-            return flask.send_file(img_io, mimetype="image/png")
-        
     print("Starting web server!")
-    threading.Thread(name="SocketIO server", target=(lambda:socketio.run(app=app, port=port, host=host, debug=False, log_output=False)), daemon=True).start()
+    socketio_thread = threading.Thread(name="SocketIO server", target=(lambda:socketio.run(app=app, port=port, host=host, debug=False, log_output=True)), daemon=True)
+    socketio_thread.start()
+    print("Webserver started")
     return socketio

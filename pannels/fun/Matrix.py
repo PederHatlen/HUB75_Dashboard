@@ -1,4 +1,4 @@
-import functions, random
+import properties, random
 
 class trail:
     def __init__(self, x = "", y = ""):
@@ -11,7 +11,7 @@ class trail:
 trails = [trail() for i in range(128)]
 
 def get():
-    im, d = functions.getBlankIM()
+    im, d = properties.getBlankIM()
 
     remove = []
 
