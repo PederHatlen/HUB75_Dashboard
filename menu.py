@@ -3,26 +3,15 @@ import properties
 selected = "Clocks" # Default pannel can be sett here
 active = False
 
-DISPLAY_DEBUG = True
 PADDX, PADDY = 4, 3
 
-menuColor = {
-    "sys":properties.color_rgb["lightred"],
-    "dev":properties.color_rgb["yellow"],
-    "fun":properties.color_rgb["purple"],
-    "info":properties.color_rgb["green"],
-    "DEFAULT": (68, 68, 68)
-}
+pannels, pannelList, folderList = "", [], []
+def setup():
+    global pannels, pannelList, folderList
+    pannels = properties.pannels
 
-pannels = ""
-pannelList, folderList = [], []
-
-def setup(pannelsIn):
-    global pannels, pannelList, folderList, menuColor
-    pannels = pannelsIn
-
-    pannelList = [p for p in pannels.__all__ if DISPLAY_DEBUG or p not in pannels.folders["dev"]]
-    folderList = [f for f in pannels.dirs if DISPLAY_DEBUG or f != "dev"]
+    pannelList = [p for p in pannels.__all__ if properties.DISPLAY_DEBUG_MENU or p not in pannels.folders["dev"]]
+    folderList = [f for f in pannels.dirs if properties.DISPLAY_DEBUG_MENU or f != "dev"]
 
 def dial(dir):
     global selected
@@ -38,9 +27,9 @@ def get():
 
     for i in range(len(folderList)):
         dir = folderList[i]
-        if dir == "dev" and not DISPLAY_DEBUG: continue
+        if dir == "dev" and not properties.DISPLAY_DEBUG_MENU: continue
 
-        dirColor = menuColor[dir] if dir in menuColor else menuColor["DEFAULT"]
+        dirColor = properties.menuColor[dir] if dir in properties.menuColor else properties.menuColor["DEFAULT"]
 
         if selected in pannels.folders[dir]:
             d.rectangle(((PADDX, (i*7)+PADDY-1), (titleLength+PADDX, (i*7)+PADDY+5)), dirColor)
@@ -61,7 +50,7 @@ def get():
         else: d.text((PADDX+1, (i*7)+PADDY), dir, "#fff")
 
         for i in range(len(pannelList)):
-            color = menuColor[pannels.foldersINV[pannelList[i]]] if (pannels.foldersINV[pannelList[i]] in menuColor) else menuColor["DEFAULT"]
+            color = properties.menuColor[pannels.foldersINV[pannelList[i]]] if (pannels.foldersINV[pannelList[i]] in properties.menuColor) else properties.menuColor["DEFAULT"]
             d.point((1, PADDY+i), color)
             if pannelList[i] == selected: d.point((2, PADDY+i), "#fff")
     return im

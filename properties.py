@@ -2,19 +2,22 @@ import pathlib, json
 import numpy as np
 from PIL import ImageFont, Image, ImageDraw, ImageColor
 
+### Settings ###
 TARGET_FPS = 15
 WIDTH, HEIGHT = 64, 32
+DISPLAY_DEBUG_MENU = True
 
-ha = {"display_status":True, "spotify_lighting":False}
+# Globally available properties
+ha, data, pannels = {}, {}, ""
 
-path = str(pathlib.Path(__file__).parent.resolve())
 
-with open(f"{path}/secrets.json", "r") as fi: secrets = json.load(fi)
+PATH = str(pathlib.Path(__file__).parent.resolve())
+with open(f"{PATH}/secrets.json", "r") as fi: secrets = json.load(fi)
 
 font = {
-    5: ImageFont.truetype(f"{path}/fonts/small05.ttf", 5),
-    10: ImageFont.truetype(f"{path}/fonts/small05.ttf", 10),
-    15: ImageFont.truetype(f"{path}/fonts/small05.ttf", 15),
+    5: ImageFont.truetype(f"{PATH}/fonts/small05.ttf", 5, layout_engine=ImageFont.Layout.BASIC),
+    10: ImageFont.truetype(f"{PATH}/fonts/small05.ttf", 10, layout_engine=ImageFont.Layout.BASIC),
+    15: ImageFont.truetype(f"{PATH}/fonts/small05.ttf", 15, layout_engine=ImageFont.Layout.BASIC),
 }
 color = {
     "red":      "#FF0000",
@@ -35,8 +38,17 @@ color = {
 color_rgb = {}
 for c in color: color_rgb[c] = ImageColor.getrgb(color[c])
 
-def getBlankIM(color = None):
+menuColor = {
+    "sys":color_rgb["lightred"],
+    "dev":color_rgb["yellow"],
+    "fun":color_rgb["purple"],
+    "info":color_rgb["green"],
+    "DEFAULT": (68, 68, 68)
+}
+
+### Functions ###
+def getBlankIM(color = None) -> tuple[Image.Image, ImageDraw.ImageDraw]:
     im = Image.new(mode="RGB", size=(WIDTH, HEIGHT), color=color)
     return im, ImageDraw.Draw(im)
 
-def imFromArr(arr, mode = "RGB"): return Image.fromarray(np.array(arr, dtype=np.uint8), mode=mode)
+def imFromArr(arr, mode = "RGB") -> Image.Image: return Image.fromarray(np.array(arr, dtype=np.uint8), mode=mode)
