@@ -51,7 +51,7 @@ def basic_digital():
         # d.text((63, 16), f"UKE {now.isocalendar()[1]}", "#FF6622", anchor="rt")
 
         if "outside_temp" in properties.ha and "inside_temp" in properties.ha:
-            properties.ha['outside_temp'] = 32.6
+            # properties.ha['outside_temp'] = 32.6
             d.text((XO, YO+20), "UT", "#888")
             d.text((XO+8, YO+20), f"{round(abs(properties.ha['outside_temp']))}", "#F66" if properties.ha['outside_temp'] > 0 else "#6AF")
 
