@@ -3,6 +3,7 @@ from PIL import Image, ImageDraw, ImageEnhance
 from threading import Thread
 from datetime import datetime as dt, timedelta as td
 from websockets.sync.client import connect
+from math import ceil
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -10,35 +11,48 @@ from skimage.color import rgb2lab, lab2rgb
 
 """
 TO USE THIS INTEGRATION:
+
 You need a Spotify developer app (https://developer.spotify.com/dashboard)
 Get a refresh token, client id, and client secret
     The two last can be retrieved from the spotify app you have made
     You can get a refresh token by completing the Oauth2 initiation ritual
-all these needs to be added to the json file "secrets.json" in the root of the project (where the main.py file is)
+
+All these needs to be added to the json file "secrets.json" in the root of the project (where the main.py file is)
+    i.e.: {"refresh_token":"TOKEN", "client_id":"ID", "client_secret":"SECRET"}
+Placed in the root of this project (same folder as main.py)
+To add custom names for the devices (other than generic "iPhone" or [hostname])
+    add:  "device_mapping": {[deviceid]: [name]}
+
+USING THE WS:
+
+There is three different posibilities for using the socket.
+They are chosen by setting the SPOTIFY_SOCKET variable to either of these
+    host:[PORT] - Hosts a WS, accessible for other programs as well
+    [ADDRESS]   - Address to socket
+    local       - Runs the SpotifyWS locally without exposing a WS
+
+If it is unset or set to False, the pannel will not be loaded.
+
+DATA FROM SpotifyWS:
+
+    playing:    bool
+    title:      str
+    artists:    str
+    album:      str
+    progress:   int ms
+    duration:   int ms
+    time:       timestamp
+    cover_url:  str url
+    device:     {id: str, name: str, etc... }
 
 """
 
-G = properties.color_rgb["spotify"]
-B, F, H = (0,0,0,0), [*G, 255], [*G, 127]
-pauseIcon = properties.imFromArr([[F,F,B,F,F],[F,F,B,F,F],[F,F,B,F,F],[F,F,B,F,F],[F,F,B,F,F]], "RGBA")
-playIcon  = properties.imFromArr([[F,H,B,B,B],[F,F,F,H,B],[F,F,F,F,F],[F,F,F,H,B],[F,H,B,B,B]], "RGBA")
+SPOTIFY_SOCKET = "host:1338"
+SWATCH = (3, 3, 3) # X, Y, Padding
 
-prev_dial_turn = 0
-fn = 0
-ws = ""
-data = {}
-
-covers = {}
-albumColors = []
+prev_dial_turn, ws = 0, ""
+data, covers, albumColors = {}, {}, []
 HAIsUpdated = False
-
-SWATCH_X, SWATCH_Y, SWATCH_PAD = 3, 3, 3
-PALETTESIZE = len(properties.secrets["has"]["light_ids"])
-
-ha_data = {}
-def ha_data_interface(interface):
-    global ha_data
-    ha_data = interface
 
 def rgb2lum(rgb): return (0.2126*rgb[0] + 0.7152*rgb[1] + 0.0722*rgb[2])/255
 def rgb_to_hsv(rgb):
@@ -48,7 +62,9 @@ def rgb_to_hsv(rgb):
 # Using K-Means to group into n- clusters of similar colors (default 3)
 # Filtering out too dark/light and low saturated colors, if possible
 # Using LAB colors for more even distribution
-def get_palette(im, n_colors=4, sorting="none"):
+def get_palette(im, n_colors=5, sorting="none"):
+    if n_colors < 1: n_colors = 5
+    
     img = np.array(im.convert("RGB"))
     pixels = img.reshape((-1, 3))
 
@@ -70,119 +86,131 @@ def get_palette(im, n_colors=4, sorting="none"):
     elif sorting == "lightness": palette = palette[np.argsort([-rgb2lum(c) for c in palette])]              # Sorting by luminance
 
     palette = palette.tolist()
-
-    if len(filtered) < n_colors: print(f"Pixel count unchanged, Final palette: {palette}")
-    else: print(f"Reduced pixel count by {((len(pixels)-len(filtered))/len(pixels))*100:.2f}% to {len(filtered)}, Final palette: {palette}")
-
     return palette
 
-## SpotifyWS data: ##
-# playing:    bool
-# title:      str
-# artists:    str
-# album:      str
-# progress:   int ms
-# duration:   int ms
-# time:  timestamp
-# cover_url:  str url
-
 def setHaColors(colors, transition = 1):
-    complete = ["has" in properties.secrets, "access_token" in properties.secrets["has"], "light_ids" in properties.secrets["has"], "ip" in properties.secrets["has"]]
+    complete = ["has" in properties.secrets,"access_token" in properties.secrets["has"],"ip" in properties.secrets["has"],"spotify_lights" in properties.ha]
     if not all(complete): return False
     try:
+        success = True
         headers = {"Authorization": f"Bearer {properties.secrets['has']['access_token']}","content-type": "application/json",}
-        for i in range(len(properties.secrets['has']['light_ids'])):
-            data = {"entity_id":properties.secrets['has']['light_ids'][i], "rgb_color":colors[i%len(colors)], "transition": transition}
+        for i in range(len(properties.ha["spotify_lights"])):
+            # print(properties.ha["spotify_lights"][i])
+            data = {"entity_id":properties.ha["spotify_lights"][i], "rgb_color":colors[i%len(colors)], "transition": transition, "effect":"Solid"}
             resp = requests.post(f"http://{properties.secrets['has']['ip']}/api/services/light/turn_on", headers=headers, json=data)
-            print(f"Setting {data['entity_id']} to {data['rgb_color']}")
-            if resp.status_code != 200: print(f"Error {resp.status_code}")
-    except Exception as E: print(f"Couldn't set colors with HAS: {E}")
+            if resp.status_code != 200:
+                print(f"HAColor: Error {resp.status_code}")
+                success = False
+        if success: print(f"HAColor: Successfully set HA colors")
+    except Exception as E: print(f"HAColor: Couldn't set colors with HAS: {E}")
 
 def process_data(new_data):
     global covers, data, HAIsUpdated, albumColors
-    if new_data["title"] == "" and new_data["artists"] == [] and new_data["cover_url"] == "": return print("Nothing playing")
+    if new_data["title"] == "" and new_data["artists"] == [] and new_data["cover_url"] == "": return # print("Nothing playing")
+    if SpotifyWS == "": print(f"Spotify: playing: {new_data['title']} by {', '.join(new_data['artists'])}")
 
     # get the cover url, and download it if not allready
     if new_data["cover_url"] not in covers:
-        tempCover = Image.open(requests.get(new_data["cover_url"], stream=True).raw)
-        covers[new_data["cover_url"]] = ImageEnhance.Contrast(tempCover.resize((32,32), Image.Resampling.HAMMING)).enhance(1.25)
+        temp_im = ImageEnhance.Contrast(Image.open(requests.get(new_data["cover_url"], stream=True).raw)).enhance(1.5)
+        covers[new_data["cover_url"]] = ImageEnhance.Brightness(temp_im.resize((32,32), Image.Resampling.HAMMING)).enhance(0.9)
         if len(covers) > 20: del covers[list(covers.keys())[0]]
-        print(f"There is now {len(covers)} saved covers.")
 
     if "cover_url" not in data or new_data["cover_url"] != data["cover_url"]:
-        albumColors = get_palette(covers[new_data["cover_url"]], PALETTESIZE, "lightness")
+        albumColors = get_palette(covers[new_data["cover_url"]], 5 if "spotify_lights" not in properties.ha else len(properties.ha["spotify_lights"]), "lightness")
         HAIsUpdated = False
 
     new_data["time"] = dt.fromtimestamp(new_data["time"])
     data = new_data
+    properties.data["spotify_data"] = data
 
-def data_thread():
-    global data, ws
+def data_thread(host):
+    global ws
     while True:
         try:
-            ws = connect("ws://localhost:1338")
-            print("Connected to WebSocket")
+            ws = connect(f"ws://{host}")
+            print("Spotify: Connected to WebSocket")
             while True: process_data(json.loads(ws.recv()))
-        except Exception as e: print(f"Disconnected from spotify WS... trying to reconnect in 5s {traceback.format_exc()}")
+        except Exception as e: print(f"Spotify: Disconnected from spotify WS... trying to reconnect in 5s {traceback.format_exc()}")
         time.sleep(5)
 
-def btn(): (ws.send("pause" if data["playing"] else "play"))
+SpotifyWS = ""
+if SPOTIFY_SOCKET == False or SPOTIFY_SOCKET == "":
+    raise Exception("socket is not set-up (See config in ./pannels/info/Spotify.py)")
+elif SPOTIFY_SOCKET.lower() == "local":
+    import SpotifyWS
+    Thread(target=SpotifyWS.threadedData, name="SpotifyRunner", args=[process_data], daemon=True).start()
+else:
+    host = SPOTIFY_SOCKET
+    if SPOTIFY_SOCKET.split(":")[0].lower() == "host":
+        import SpotifyWS
+        SpotifyWS.run(int(SPOTIFY_SOCKET.split(":")[-1]))
+        host = f"localhost:{SPOTIFY_SOCKET.split(':')[-1]}"
+    Thread(target=data_thread, name="SpotifyRunner", args=[host], daemon=True).start()
+
+def btn():
+    global SpotifyWS
+    if SpotifyWS != "": SpotifyWS.player_action("pause" if data["playing"] else "play")
 
 def dial(e):
-    global prev_dial_turn, fullscreen
-    if prev_dial_turn > dt.now().timestamp() - 1: return
+    global prev_dial_turn, fullscreen, ws, SpotifyWS
+    if prev_dial_turn > dt.now().timestamp() - 1 or (ws == "" and SpotifyWS == "") or e[0] != "1": return
+
     prev_dial_turn = dt.now().timestamp()
 
-    if e == "1R": ws.send("next")
-    elif e == "1L": ws.send("previous")
+    action = "next" if e[1] == "R" else "previous"
+    if SpotifyWS != "": SpotifyWS.player_action(action)
+    else: ws.send(action)
 
-SpotifyRunner = Thread(target=data_thread, name="SpotifyRunner", daemon=True)
-SpotifyRunner.start()
+class scrollingText():
+    def __init__(self, d, x, y, color = "#FFF", center = False):
+        self.d, self.pos, self.y, self.color, self.center, self.drawframe = d, x, y, color, center, True
+    def draw(self, text):
+        self.drawframe = not self.drawframe
+        textlen = ceil(self.d.font.getlength(text))
+        if textlen <= self.d.im.size[0]: self.pos = 0 if not self.center else int((self.d.im.size[0]-textlen)/2) +1
+        elif self.pos < 1-textlen - 6:   self.pos = 0
+        else:
+            if self.drawframe: self.pos -= 1
+            self.d.text((self.pos + textlen + 6, self.y), text, fill=self.color)
+        self.d.text((self.pos, self.y), text, fill=self.color)
+
+im, _ = properties.getBlankIM()
+
+infoArea = Image.new(mode="RGB", size=(30,30))
+info = ImageDraw.Draw(infoArea)
+info.font = properties.font[5]
+
+title_text  = scrollingText(info, 0,  0, "#FFF")
+artist_text = scrollingText(info, 0,  7, "#888")
+device_text = scrollingText(info, 0, 21, properties.color["spotify"], True)
 
 def get():
-    global data, fn, albumColors, coverURL, HAIsUpdated
-    fn +=1
-
-    im, _ = properties.getBlankIM()
-
-    # If you are not playing annything on spotify return black screen
-    if data == {}: return im
+    global data, albumColors, HAIsUpdated #, artist_pos, title_pos, device_pos
+    info.rectangle((0,0,30,30), "#000") # Clear screen
     
-    if not HAIsUpdated and data["playing"] and ha_data["spotify_lighting"]:
+    if data == {}: return im # Return blank screen if no data
+
+    # Set HA light, if that is required
+    if not HAIsUpdated and data["playing"] and ("spotify_lighting" in properties.ha and properties.ha["spotify_lighting"]):
         HAIsUpdated = True
         Thread(target=setHaColors, args=[albumColors]).start()
 
-    infoArea = Image.new(mode="RGB", size=(30,30))
-    info = ImageDraw.Draw(infoArea)
-    info.font = properties.font[5]
+    # Scrolling Title/Artists/Device
+    title_text.draw(data['title'])
+    artist_text.draw(" - ".join(data['artists']))
+    device_text.draw(data['device']['name'])
 
-    titlelength = info.font.getlength(f'{data["title"]}    ')
-    artists = "  -  ".join(data["artists"])
-    artistlength = info.font.getlength(f"{artists}    ")
+    # The albom cover colors
+    for i in range(len(albumColors)):
+        x, y = i*(SWATCH[0] + SWATCH[2]) + 0, 15
+        info.rectangle(((x, y), (x+SWATCH[0]-1, y+SWATCH[1]-1)), fill=tuple(albumColors[i]))
 
-    scrolLen = (fn//2)
-
-    if titlelength > 32:
-        textPos = (-int(scrolLen%(max(titlelength, 32))),0)
-        info.text(textPos, "    ".join([data["title"]]*3), fill=(255,255,255))
-    else: info.text((0,0), data["title"], fill="#fff")
-
-    if artistlength > 32:
-        textPos = (-int(scrolLen%(max(artistlength, 32))),8)
-        info.text(textPos, f"{artists}    {artists}", fill="#888")
-    else: info.text((0,8), artists, fill="#888")
-
+    # Progressbar
     progress = data["progress"] + (dt.now() - data["time"])/td(milliseconds=1) if data["playing"] else 0
     info.line([(0,29),(29,29)], fill="#fff", width=1)
     info.line([(0,29),(round((progress/data["duration"])*30),29)], fill=properties.color["spotify"], width=1)
 
-    icon = pauseIcon if data["playing"] else playIcon
-    infoArea.paste(icon, (12, 21), mask=icon)
-
-    for i in range(len(albumColors)):
-        x, y = i*(SWATCH_X + SWATCH_PAD) + 1, 15
-        info.rectangle(((x, y), (x+SWATCH_X-1, y+SWATCH_Y-1)), fill=tuple(albumColors[i]))
-
+    # Final assembly
     im.paste(covers[data["cover_url"]], (0,0))
     im.paste(infoArea, (33,1))
 
