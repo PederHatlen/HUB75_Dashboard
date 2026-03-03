@@ -13,7 +13,7 @@ def getKey():
         r = requests.get("https://www.nbim.no/no/")
         return re.findall('data-key="[0-9a-f-]+"', r.text)[0][len('data-key="'):-1]
     except Exception as E:
-        print(f"Exception occured: {E}")
+        print(f"NBIM:    Exception occured: {E}")
         return False
 
 def lerp(x, y, points):
@@ -72,5 +72,5 @@ def get():
 
     d.point((len(nbimValues)//10-dataExpired, 31))
     d.text((1, 1), f'Oljefondet', "#0093b5", font=properties.font[5], spacing=2)
-    d.text((1, 7), f'{int(nbimValues[-int(dataExpired*10)])}', "#FFF", font=properties.font[5], spacing=2)
+    d.text((1, 7), f'{int(nbimValues[-int(dataExpired*10)])}' if nbimValues != [] else "No data", "#FFF", font=properties.font[5], spacing=2)
     return im

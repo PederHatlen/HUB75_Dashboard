@@ -11,11 +11,13 @@ __all__ = []
 for d in dirs:
     folders[d] = []
     for loader, module_name, is_pkg in pkgutil.walk_packages([f"{currentPath}/{d}"]):
-        _module = loader.find_module(module_name).load_module(module_name)
-        globals()[module_name] = _module
-        packages[module_name] = (_module)
-        __all__.append(module_name)
-        folders[d].append(module_name)
-        foldersINV[module_name] = d
+        try:
+            _module = loader.find_module(module_name).load_module(module_name)
+            globals()[module_name] = _module
+            packages[module_name] = (_module)
+            __all__.append(module_name)
+            folders[d].append(module_name)
+            foldersINV[module_name] = d
+        except Exception as E: print(f"Startup: Could not load {module_name}: {E}")
 
-print(f"Pannels that where loaded: {__all__}")
+print(f"Startup: Loaded pannels: {__all__}")

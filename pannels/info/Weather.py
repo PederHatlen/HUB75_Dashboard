@@ -1,6 +1,7 @@
-import properties, requests, json
+import properties, requests, json, time
 from PIL import Image
 from datetime import datetime, timezone, timedelta
+from threading import Thread
 
 small05 = properties.font[5]
 
@@ -53,10 +54,10 @@ def get_cached_data():
 
 def get_data():
     global expires, dataCuttof, gettingData
-    print("Getting new data")
+    # print("Weather: Getting new data")
     cach = get_cached_data()
     if gettingData or ("expires" in cach and datetime.fromisoformat(cach["expires"]) > datetime.now(tz=UTC)):
-        print(f"Using cached data, expires {cach['expires']}")
+        print(f"Weather: Using cached data, expires {cach['expires']}")
         expires = datetime.fromisoformat(cach["expires"])
         dataCuttof = get_data_cuttof(cach)
         return cach
@@ -68,9 +69,9 @@ def get_data():
 
     try: expires = datetime.strptime(response.headers["Expires"][:-4], "%a, %d %b %Y %H:%M:%S").replace(tzinfo=UTC)
     except Exception as E:
-        print(f"Could not parse expiration time (using +4 hours) Error: {E}")
+        print(f"Weather: Could not parse expiration time (using +4 hours) Error: {E}")
         expires = datetime.now(tz=UTC) + timedelta(hours=4)
-    print(f"Got new weatherdata, expiration: {expires}")
+    print(f"Weather: Got new weatherdata, expiration: {expires}")
 
     data = {"expires":expires.isoformat(), **response.json()}
     dataCuttof = get_data_cuttof(data)
@@ -78,6 +79,17 @@ def get_data():
     with open("./tempWeather.json", "w") as fi: fi.write(json.dumps(data))
     gettingData = False
     return data
+
+### Data getting thread auto starts
+def data_thread():
+    global expires, data
+    print("Weather: Starting data thread")
+    while True:
+        try:
+            if datetime.now(tz=UTC) > expires: data = get_data()
+        except Exception as e: print(f"Error in weatherdata getter: {e}")
+        time.sleep(60)
+Thread(target=data_thread, name="WeatherRunner", daemon=True).start()
     
 def get_current_hour(t):
     global data
@@ -99,8 +111,6 @@ def get():
 
     im, d = properties.getBlankIM()
     d.font = properties.font[5]
-
-    if datetime.now(tz=UTC) > expires: data = get_data()
     
     if data == {}: 
         d.text((32, 16), "No data", anchor="mm")

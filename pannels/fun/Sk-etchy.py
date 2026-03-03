@@ -9,7 +9,7 @@ def get():
     return im
 
 def dial(e):
-    print(e)
+    # print(e)
     global x, y
     if e == "0R":   x += (1 if x <= properties.WIDTH else 0)
     elif e == "0L": x -= (1 if x > 0 else 0)
@@ -19,5 +19,5 @@ def dial(e):
 
 def btn(): 
     global drawing
-    print("Clearing")
+    print("SkEtchy: Clearing")
     drawing = [(x, y)]
