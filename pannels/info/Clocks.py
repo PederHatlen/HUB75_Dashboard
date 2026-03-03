@@ -35,12 +35,28 @@ def setlocale(name):
 
 def basic_digital():
     now = datetime.datetime.now()
+    # now = now.replace(year=2026, month=3, day=29)
     
     im, d = properties.getBlankIM()
     
     with setlocale(LOCALE_STRING):
-        d.text((2, 2), f"{now:%H:%M:%S}", "#FFF", properties.font[10])
-        d.text((2, 14), f"{now.strftime('%A')[:3]} {now:%d}. {now.strftime('%B')[:3]}", "#FFF", properties.font[5])
+        XO, YO = 3,3
+
+        d.font = properties.font[5]
+
+        d.text((XO, YO), f"{now:%H:%M}", "#FFF", properties.font[10])
+        d.text((XO+36, YO), f"{now:%S}", "#888")
+        d.text((XO, 12+YO), f"{now.strftime('%A')[:3]} {now:%d}. {now.strftime('%B')[:3]}", "#FF6622")
+
+        # d.text((63, 16), f"UKE {now.isocalendar()[1]}", "#FF6622", anchor="rt")
+
+        if "outside_temp" in properties.ha and "inside_temp" in properties.ha:
+            properties.ha['outside_temp'] = 32.6
+            d.text((XO, YO+20), "UT", "#888")
+            d.text((XO+8, YO+20), f"{round(abs(properties.ha['outside_temp']))}", "#F66" if properties.ha['outside_temp'] > 0 else "#6AF")
+
+            d.text((XO+20, YO+20), "IN", "#888")
+            d.text((XO+20+7, YO+20), f"{round(properties.ha['inside_temp'])}", "#F66")
     return im
 
 def hexFun():
