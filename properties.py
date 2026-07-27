@@ -8,11 +8,12 @@ WIDTH, HEIGHT = 64, 32
 DISPLAY_DEBUG_MENU = True
 
 # Globally available properties
-ha, data, pannels = {}, {}, ""
-
+data, pannels = {}, ""
 
 PATH = str(pathlib.Path(__file__).parent.resolve())
 with open(f"{PATH}/secrets.json", "r") as fi: secrets = json.load(fi)
+
+ha = secrets["has"]["defaults"]
 
 font = {
     5: ImageFont.truetype(f"{PATH}/fonts/small05.ttf", 5, layout_engine=ImageFont.Layout.BASIC),
