@@ -34,6 +34,7 @@ class dial:
         return render(pannels.packages[menu.selected].get())
 
     def close(self):
+        return
         self.BTN.close()
         self.DIAL.close()
 

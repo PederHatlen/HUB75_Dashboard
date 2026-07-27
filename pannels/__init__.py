@@ -1,4 +1,6 @@
-import pkgutil, os
+import pkgutil, os, sys, importlib.util
+
+excluded = [] #["Spotify"]
 
 currentPath = os.path.dirname(os.path.abspath(__file__))
 
@@ -10,9 +12,15 @@ packages = {}
 __all__ = []
 for d in dirs:
     folders[d] = []
-    for loader, module_name, is_pkg in pkgutil.walk_packages([f"{currentPath}/{d}"]):
+    for finder, module_name, is_pkg in pkgutil.walk_packages([f"{currentPath}/{d}"]):
         try:
-            _module = loader.find_module(module_name).load_module(module_name)
+            if module_name in excluded: continue
+            spec = finder.find_spec(module_name)
+            if spec is None: continue
+
+            _module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = _module
+            spec.loader.exec_module(_module)
             globals()[module_name] = _module
             packages[module_name] = (_module)
             __all__.append(module_name)

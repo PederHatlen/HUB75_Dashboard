@@ -12,7 +12,7 @@ matrix = ""
 
 def setup():
     global matrix, pWidth, pHeight, framebuffer, isSetup
-    pWidth, pHeight = properties.WIDTH, properties.HEIGHT 
+    pWidth, pHeight = properties.WIDTH, properties.HEIGHT
     geometry = piomatter.Geometry(width=pWidth, height=pHeight, n_addr_lines=(5 if pHeight > 32 else 4), rotation=piomatter.Orientation.Normal)
     framebuffer = np.asarray(Image.new(mode="RGB", size=(pWidth, pHeight))) + 0
 
@@ -20,7 +20,7 @@ def setup():
         pinout=piomatter.Pinout.AdafruitMatrixBonnet,
         framebuffer=framebuffer,
         geometry=geometry)
-    
+
     isSetup = True
 
 def render(f):

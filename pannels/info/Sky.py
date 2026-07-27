@@ -84,7 +84,7 @@ lat, long = 63.4224, 10.4320 # Trondheim
 # lat, long = 0, 10.4320 # Equator
 
 def getSunAltitude(t:datetime.datetime, lat = lat, long = long):  # Tyholttårnet, Trondheim Norway
-    # Souces: 
+    # Souces:
     # https://en.wikipedia.org/wiki/Position_of_the_Sun
     # https://sceweb.sce.uhcl.edu/helm/WEB-Positional%20Astronomy/Tutorial/Conversion/Conversion.html
     # https://aa.usno.navy.mil/faq/GAST
@@ -100,7 +100,7 @@ def getSunAltitude(t:datetime.datetime, lat = lat, long = long):  # Tyholttårne
 
     GMST = 280.46061837 + 360.98564736629 * D                                                       # Greenwich Mean Sidereal Time (suntime at Greenwich) in hours
     LHA = radians(GMST + long - degrees(RA))                                                        # Local Hour Angle (LST - Right Ascention)
-    
+
     return degrees(asin(sin(DEC) * sin(radians(lat)) + cos(DEC) * cos(radians(lat)) * cos(LHA)))    # Altitude of the sun on the sky from given coordinates
 
 dayoffset = 0
@@ -108,14 +108,14 @@ def dial(e):
     global dayoffset
     if e == "1R": dayoffset+=1
     elif e == "1L": dayoffset-=1
-    
+
 def btn():
     global dayoffset
     dayoffset = 0
 
 def get():
     global oldim, fn_last, dayoffset
-    
+
     im = Image.new(mode="RGB", size=(64, 32))
     d = ImageDraw.Draw(im, mode="RGBA")
     now = datetime.datetime.now() + datetime.timedelta(days=dayoffset) # Scrub through the year
@@ -145,7 +145,7 @@ def get():
     d.point(sunPos, "#FFF")
 
     moonPos = (54, 1)
-    im.paste(moonPhases[((astral.moon.phase(modified)/27.99)*8)//1], moonPos)
+    im.paste(moonPhases[int((astral.moon.phase(modified)/27.99)*8)], moonPos)
     d.ellipse(((moonPos[0]-1, moonPos[1]-1), (moonPos[0]+6, moonPos[1]+6)), (*MOON_COLOR, 19))
     d.ellipse(((moonPos[0]-2, moonPos[1]-2), (moonPos[0]+7, moonPos[1]+7)), (*MOON_COLOR, 5))
 

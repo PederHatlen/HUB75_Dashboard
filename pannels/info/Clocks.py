@@ -15,14 +15,14 @@ class stardust:
             self.y = abs(self.x)
             self.x = 0
         else: self.y = y if y != "" else 0
-    
+
     def render(self, d, color = (255,255,255)):
         self.x += self.dir[0]
         self.y += self.dir[1]
         for n in range(self.len):
             c = tuple(round(((self.len-n)/self.len)*x) for x in color)
             d.point((self.x-self.dir[0]*n, self.y-self.dir[1]*n), c)
-    
+
     def isBound(self): return self.x < 64 or self.y < 32
 
 dust = [stardust(random.randint(0,32)) for i in range(100)]
@@ -36,11 +36,11 @@ def setlocale(name):
 def basic_digital():
     now = datetime.datetime.now()
     # now = now.replace(year=2026, month=3, day=29)
-    
+
     im, d = properties.getBlankIM()
-    
+
     with setlocale(LOCALE_STRING):
-        XO, YO = 3,3
+        XO, YO = 2,2
 
         d.font = properties.font[5]
 
@@ -52,11 +52,11 @@ def basic_digital():
 
         if "outside_temp" in properties.ha and "inside_temp" in properties.ha:
             # properties.ha['outside_temp'] = 32.6
-            d.text((XO, YO+20), "UT", "#888")
-            d.text((XO+8, YO+20), f"{round(abs(properties.ha['outside_temp']))}", "#F66" if properties.ha['outside_temp'] > 0 else "#6AF")
+            d.text((XO, YO+19), "UT", "#888")
+            d.text((XO+8, YO+19), f"{round(abs(properties.ha['outside_temp'])) if abs(properties.ha['outside_temp']) >= 10 else abs(properties.ha['outside_temp'])}", "#F66" if properties.ha['outside_temp'] > 0 else "#6AF")
 
-            d.text((XO+20, YO+20), "IN", "#888")
-            d.text((XO+20+7, YO+20), f"{round(properties.ha['inside_temp'])}", "#F66")
+            d.text((XO+20, YO+19), "IN", "#888")
+            d.text((XO+20+7, YO+19), f"{round(properties.ha['inside_temp'])}", "#F66")
     return im
 
 def hexFun():
@@ -135,12 +135,11 @@ def analog():
 
     return im
 
-
 font = {1:[5,6], 2:[1,3,4,6,7], 3:[1,4,5,6,7], 4:[2,5,6,7], 5:[1,2,4,5,7], 6:[1,2,3,4,5,7], 7:[1,5,6], 8:[1,2,3,4,5,6,7,8], 9:[1,2,4,5,6,7], 0:[1,2,3,4,5,6]}
 def character(n, fill = "#fff", size = 8):
     char = Image.new(mode="RGBA", size=(size, size*2+1))
     d = ImageDraw.Draw(char)
-    
+
     if 1 in font[n]: d.line((0, 0, size, 0), fill=fill)                 # 1 - TopLine
     if 2 in font[n]: d.line((0, 0, 0, size), fill=fill)                 # 2 - TopLeft
     if 3 in font[n]: d.line((0, size, 0, 2*size), fill=fill)            # 3 - BottomLeft
