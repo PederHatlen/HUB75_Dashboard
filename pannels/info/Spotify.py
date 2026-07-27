@@ -44,11 +44,14 @@ DATA FROM SpotifyWS:
     time:       timestamp
     cover_url:  str url
     device:     {id: str, name: str, etc... }
+    is_ai:      bool
 
 """
 
 SPOTIFY_SOCKET = "host:1338"
-SWATCH = (3, 3, 3) # X, Y, Padding
+SWATCH = (3, 3, 1) # X, Y, Padding
+
+TELL_HA_ABOUT_AI = True
 
 prev_dial_turn, ws = 0, ""
 data, covers, albumColors = {}, {}, []
@@ -59,12 +62,12 @@ def rgb_to_hsv(rgb):
     rgb = np.array(rgb) / 255.0
     return np.array(Image.fromarray((rgb[np.newaxis, np.newaxis, :] * 255).astype('uint8')).convert('HSV'))[0, 0] / 255.0
 
-# Using K-Means to group into n- clusters of similar colors (default 3)
+# Using K-Means to group into n- clusters of similar colors (default 5)
 # Filtering out too dark/light and low saturated colors, if possible
 # Using LAB colors for more even distribution
 def get_palette(im, n_colors=5, sorting="none"):
     if n_colors < 1: n_colors = 5
-    
+
     img = np.array(im.convert("RGB"))
     pixels = img.reshape((-1, 3))
 
@@ -116,12 +119,24 @@ def process_data(new_data):
         if len(covers) > 20: del covers[list(covers.keys())[0]]
 
     if "cover_url" not in data or new_data["cover_url"] != data["cover_url"]:
-        albumColors = get_palette(covers[new_data["cover_url"]], 5 if "spotify_lights" not in properties.ha else len(properties.ha["spotify_lights"]), "lightness")
+        albumColors = get_palette(covers[new_data["cover_url"]], 0 if "spotify_lights" not in properties.ha else len(properties.ha["spotify_lights"]), "lightness")
         HAIsUpdated = False
+
+    if new_data['is_ai'] and properties.ha["skip_ai_songs"]:
+        if SpotifyWS != "": SpotifyWS.player_action("next")
+        else: ws.send("next")
+
+
+    if TELL_HA_ABOUT_AI:
+        headers = {"Authorization": f"Bearer {properties.secrets['has']['access_token']}","content-type": "application/json",}
+        body = {"entity_id":"input_boolean.spotify_playing_ai"}
+        resp = requests.post(f"http://{properties.secrets['has']['ip']}/api/services/input_boolean/{'turn_on' if new_data['is_ai'] and new_data['playing'] else 'turn_off'}", headers=headers, json=body)
+        if resp.status_code != 200: print(f"Spotify: HomeAssistant Error {resp.status_code}")
 
     new_data["time"] = dt.fromtimestamp(new_data["time"])
     data = new_data
     properties.data["spotify_data"] = data
+
 
 def data_thread(host):
     global ws
@@ -132,6 +147,7 @@ def data_thread(host):
             while True: process_data(json.loads(ws.recv()))
         except Exception as e: print(f"Spotify: Disconnected from spotify WS... trying to reconnect in 5s {traceback.format_exc()}")
         time.sleep(5)
+
 
 SpotifyWS = ""
 if SPOTIFY_SOCKET == False or SPOTIFY_SOCKET == "":
@@ -147,9 +163,10 @@ else:
         host = f"localhost:{SPOTIFY_SOCKET.split(':')[-1]}"
     Thread(target=data_thread, name="SpotifyRunner", args=[host], daemon=True).start()
 
+
 def btn():
     global SpotifyWS
-    if SpotifyWS != "": SpotifyWS.player_action("pause" if data["playing"] else "play")
+    if SpotifyWS != "" and "playing" in data: SpotifyWS.player_action("pause" if data["playing"] else "play")
 
 def dial(e):
     global prev_dial_turn, fullscreen, ws, SpotifyWS
@@ -174,20 +191,21 @@ class scrollingText():
             self.d.text((self.pos + textlen + 6, self.y), text, fill=self.color)
         self.d.text((self.pos, self.y), text, fill=self.color)
 
-im, _ = properties.getBlankIM()
 
-infoArea = Image.new(mode="RGB", size=(30,30))
+im, d = properties.getBlankIM()
+
+infoArea = Image.new(mode="RGB", size=(30, 30))
 info = ImageDraw.Draw(infoArea)
 info.font = properties.font[5]
 
 title_text  = scrollingText(info, 0,  0, "#FFF")
 artist_text = scrollingText(info, 0,  7, "#888")
-device_text = scrollingText(info, 0, 21, properties.color["spotify"], True)
+device_text = scrollingText(info, 0, 21, properties.color["spotify"])
 
 def get():
-    global data, albumColors, HAIsUpdated #, artist_pos, title_pos, device_pos
-    info.rectangle((0,0,30,30), "#000") # Clear screen
-    
+    global data, albumColors, HAIsUpdated
+    info.rectangle((0, 0, 30, 30), "#000") # Clear screen
+
     if data == {}: return im # Return blank screen if no data
 
     # Set HA light, if that is required
@@ -196,22 +214,27 @@ def get():
         Thread(target=setHaColors, args=[albumColors]).start()
 
     # Scrolling Title/Artists/Device
-    title_text.draw(data['title'])
-    artist_text.draw(" - ".join(data['artists']))
-    device_text.draw(data['device']['name'])
+    title_text.draw(data["title"])
+    artist_text.draw(" - ".join(data["artists"]))
+    device_text.draw(data["device"]["name"])
 
     # The albom cover colors
     for i in range(len(albumColors)):
-        x, y = i*(SWATCH[0] + SWATCH[2]) + 0, 15
-        info.rectangle(((x, y), (x+SWATCH[0]-1, y+SWATCH[1]-1)), fill=tuple(albumColors[i]))
+        x, y = i * (SWATCH[0] + SWATCH[2]) + 0, 15
+        info.rectangle(((x, y), (x + SWATCH[0] - 1, y + SWATCH[1] - 1)), fill=tuple(albumColors[i]))
 
     # Progressbar
-    progress = data["progress"] + (dt.now() - data["time"])/td(milliseconds=1) if data["playing"] else 0
-    info.line([(0,29),(29,29)], fill="#fff", width=1)
-    info.line([(0,29),(round((progress/data["duration"])*30),29)], fill=properties.color["spotify"], width=1)
+    progress = data["progress"] + (dt.now() - data["time"]) / td(milliseconds=1) if data["playing"] else 0
+    info.line([(0, 29), (29, 29)], fill="#fff", width=1)
+    info.line([(0, 29), (round((progress / data["duration"]) * 30), 29)], fill=properties.color["spotify"], width=1)
 
     # Final assembly
-    im.paste(covers[data["cover_url"]], (0,0))
-    im.paste(infoArea, (33,1))
+    im.paste(covers[data["cover_url"]], (0, 0))
+    im.paste(infoArea, (33, 1))
+
+    if data["is_ai"]:
+        d.text((32,10), "MADE", font=properties.font[10], anchor="mm", fill=properties.color["lightred"])
+        d.text((32,22), "BY AI", font=properties.font[10], anchor="mm", fill=properties.color["lightred"])
+    # else: d.text((32,16), "NOT AI", font=properties.font[10], anchor="mm", fill=properties.color["green"])
 
     return im

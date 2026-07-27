@@ -14,44 +14,6 @@ all these needs to be added to the json formated file "spotify.secret" in the ro
     i.e. {"refresh_token":"TOKEN", "client_id":"ID", "client_secret":"SECRET"}
 """
 
-import time, base64, json, requests, threading
-from websockets.sync import server
-from datetime import datetime as dt, timedelta as td
-
-MS = td(milliseconds=1)
-INTERVAL = td(seconds=2)
-
-data = {"playing": False, "title": "", "artists": [], "album": "", "progress": 0, "duration": 10000, "cover_url": ""}
-next_data = dt.now()
-clients = set()
-
-with open("./secrets.json", "r") as fi: spotifySecrets = json.load(fi)["spotify"]
-authorization = base64.b64encode("".join([spotifySecrets["client_id"], ":", spotifySecrets["client_secret"]]).encode("ascii")).decode("ascii")
-token_runout = dt.now()
-access_token = ""
-
-def get_refresh_token():
-    global access_token, token_runout
-    if token_runout < dt.now():
-        body = {'grant_type':'refresh_token','refresh_token':spotifySecrets["refresh_token"]}
-        headers = {'Authorization':f'Basic {authorization}','Content-Type':'application/x-www-form-urlencoded'}
-        response = requests.request("POST", "https://accounts.spotify.com/api/token", data=body, headers=headers)
-        raw = response.json()
-        if response.status_code != 200: raise Exception("Didn't get an auth code")
-        # print(f"Code retrieval: {raw}")
-        token_runout = (dt.now() + td(seconds=raw["expires_in"] - 10))
-
-        access_token = raw["access_token"]
-    return access_token
-
-def player_action(action):
-    global next_data
-    print(f"Spotify: Sending request {action}")
-    method = "put" if action in ["play", "pause"] else "post"
-    response = requests.request(method, f"https://api.spotify.com/v1/me/player/{action}", headers={'Authorization':f'Bearer {get_refresh_token()}'})
-    if response.status_code == 200: next_data = dt.now()
-    else: print(f"Spotify: Error sending to Spotify: {response.status_code} {response.reason}")
-
 ## SpotifyWS returns data: ##
 # playing:    bool
 # title:      str
@@ -62,6 +24,59 @@ def player_action(action):
 # time:       timestamp
 # cover_url:  str url
 # device:     {name: str, id: str, **etc.}
+# is_ai:      bool (if artist is on this list: https://raw.githubusercontent.com/CennoxX/spotify-ai-blocker/refs/heads/main/SpotifyAiArtists.csv)
+
+import time, base64, json, requests, threading
+from websockets.sync import server
+from datetime import datetime as dt, timedelta as td
+
+AI_ARTIST_LIST = "https://raw.githubusercontent.com/CennoxX/spotify-ai-blocker/refs/heads/main/SpotifyAiArtists.csv"
+
+MS = td(milliseconds=1)
+INTERVAL = td(seconds=2)
+
+HAIsUpdated = False
+
+data = {"playing": False, "title": "", "artists": [], "album": "", "progress": 0, "duration": 10000, "cover_url": "", "is_ai":False}
+next_data = dt.now()
+clients = set()
+
+with open("./secrets.json", "r") as fi: spotifySecrets = json.load(fi)["spotify"]
+authorization = base64.b64encode("".join([spotifySecrets["client_id"], ":", spotifySecrets["client_secret"]]).encode("ascii")).decode("ascii")
+token_runout = dt.now()
+access_token = ""
+
+ai_artist_list, ai_artist_list_last_updated = set(), 0
+def artist_is_ai(artist_id):
+    global ai_artist_list, ai_artist_list_last_updated
+    if len(ai_artist_list) == 0 or ai_artist_list_last_updated < (dt.now() - td(hours=12)):
+        ai_artist_list = {s.split(",")[1] for s in requests.get(AI_ARTIST_LIST).text.split("\n")}
+        ai_artist_list_last_updated = dt.now()
+        print(f"Spotify: Loaded list of AI artist, total length: {len(ai_artist_list)}")
+    return artist_id in ai_artist_list
+
+def get_access_token():
+    global access_token, token_runout
+    if token_runout < dt.now() or access_token == "":
+        body = {'grant_type':'refresh_token','refresh_token':spotifySecrets["refresh_token"]}
+        headers = {'Authorization':f'Basic {authorization}','Content-Type':'application/x-www-form-urlencoded'}
+        response = requests.request("POST", "https://accounts.spotify.com/api/token", data=body, headers=headers)
+        raw = response.json()
+        if response.status_code != 200: raise Exception(f"Didn't get an auth code: {response.text}")
+        # print(f"Code retrieval: {raw}")
+        token_runout = dt.now() + td(seconds=raw["expires_in"] - 10)
+
+        access_token = raw["access_token"]
+    return access_token
+
+
+def player_action(action):
+    global next_data
+    print(f"Spotify: Sending request {action}")
+    method = "put" if action in ["play", "pause"] else "post"
+    response = requests.request(method, f"https://api.spotify.com/v1/me/player/{action}", headers={"Authorization": f"Bearer {get_access_token()}"})
+    if response.status_code == 200: next_data = dt.now()
+    else: print(f"Spotify: Error sending to Spotify: {response.status_code} {response.reason}")
 
 def digest(raw):
     global data
@@ -77,25 +92,28 @@ def digest(raw):
             "duration": raw["item"]["duration_ms"],
             "time": dt.now().timestamp(),
             "cover_url": raw["item"]["album"]["images"][0]["url"],
-            "device": raw["device"]
+            "device": raw["device"],
+            "is_ai": any(artist_is_ai(a["id"]) for a in raw["item"]["artists"] if a["type"] == "artist"),
         }
     except Exception as e:
         print(f"Spotify: It didn't want to be digested: {e}")
         data["playing"] = False
         return data
 
+
 def get_data():
     global data
     try:
-        response = requests.get("https://api.spotify.com/v1/me/player", headers={'Authorization':f'Bearer {get_refresh_token()}'})
+        response = requests.get("https://api.spotify.com/v1/me/player", headers={'Authorization':f'Bearer {get_access_token()}'})
         if response.status_code == 200: return digest(response.json())
     except Exception as e: print(f"Spotify: Error: {e}")
     data["playing"] = False
     return data
 
+
 # Get new data from spotify
 # every 2 seconds or if song ended
-def threadedData(callback = ""):
+def threadedData(callback=""):
     global data, next_data
     while True:
         try:
@@ -105,12 +123,13 @@ def threadedData(callback = ""):
 
                 change = data["playing"] != old["playing"] or data["title"] != old["title"] or data["artists"] != old["artists"]
                 if change:
-                    print(f"Spotify: NEW song: {data['title']} by {', '.join(data['artists'])} [{'playing' if data['playing'] else 'paused'} on {data['device']['name']} ({data['device']['id']})]")
+                    print(f"Spotify: NEW song: {data['title']} by {', '.join(data['artists'])} [{'playing' if data['playing'] else 'paused'} on {data['device']['name']} ({data['device']['id']})] (is {'possibly' if data['is_ai'] else 'not'} AI)")
                     for c in clients: c.send(json.dumps(data))
                     if callback != "": callback(data)
-                next_data = dt.now() + min(INTERVAL, td(hours=data["playing"], milliseconds=100 + data["duration"] - data["progress"]))                    
+                next_data = dt.now() + min(INTERVAL, td(hours=data["playing"], milliseconds=100 + data["duration"] - data["progress"]))
         except Exception as E: print(f"Spotify: Error: {E}")
         time.sleep(0.25)
+
 
 def handler(ws):
     global clients, data
@@ -123,14 +142,17 @@ def handler(ws):
                 player_action(m)
     finally: clients.remove(ws)
 
+
 def start_ws(host, port):
     with server.serve(handler, host, port) as s: s.serve_forever()
+
 
 def run(port, host="0.0.0.0"):
     print("Spotify: Starting Spotify runner")
     threading.Thread(name="SpotifyRunner", target=threadedData, daemon=True).start()
     print(f"Spotify: Starting WebSocket on port :{port}")
     threading.Thread(name="SpotifyWS", target=start_ws, args=(host, port), daemon=True).start()
+
 
 if __name__ == "__main__":
     run(1338)
